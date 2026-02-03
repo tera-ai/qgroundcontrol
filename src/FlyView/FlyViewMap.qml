@@ -324,6 +324,57 @@ FlightMap {
         }
     }
 
+    // Odometry path head marker (star shape to indicate current position)
+    MapQuickItem {
+        id:             odometryHeadMarker
+        z:              QGroundControl.zOrderTrajectoryLines + 1
+        visible:        odometryPathPolyline.visible && _activeVehicle && _activeVehicle.odometryPathPoints.lastPoint.isValid
+        coordinate:     _activeVehicle ? _activeVehicle.odometryPathPoints.lastPoint : QtPositioning.coordinate()
+        anchorPoint.x:  odometryHeadShape.width / 2
+        anchorPoint.y:  odometryHeadShape.height / 2
+
+        sourceItem: Canvas {
+            id:     odometryHeadShape
+            width:  16
+            height: 16
+
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.reset()
+                
+                var cx = width / 2
+                var cy = height / 2
+                var outerRadius = width / 2 - 1
+                var innerRadius = outerRadius * 0.4
+                var spikes = 4
+                var rotation = -Math.PI / 2  // Start from top
+
+                ctx.beginPath()
+                for (var i = 0; i < spikes * 2; i++) {
+                    var radius = (i % 2 === 0) ? outerRadius : innerRadius
+                    var angle = rotation + (i * Math.PI / spikes)
+                    var x = cx + Math.cos(angle) * radius
+                    var y = cy + Math.sin(angle) * radius
+                    if (i === 0) {
+                        ctx.moveTo(x, y)
+                    } else {
+                        ctx.lineTo(x, y)
+                    }
+                }
+                ctx.closePath()
+
+                // Fill with bright color
+                ctx.fillStyle = "#FFD700"  // Gold/yellow star
+                ctx.fill()
+                
+                // Stroke with darker outline
+                ctx.strokeStyle = "#536DFF"  // Match odometry path color
+                ctx.lineWidth = 1.5
+                ctx.stroke()
+            }
+        }
+    }
+
     // Add the vehicles to the map
     MapItemView {
         model: QGroundControl.multiVehicleManager.vehicles

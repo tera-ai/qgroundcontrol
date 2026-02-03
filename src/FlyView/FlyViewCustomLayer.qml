@@ -64,7 +64,9 @@ Item {
             }
 
             QGCCheckBox {
-                text:               qsTr("Odometry Path")
+                property bool _usingFallback: _activeVehicle ? _activeVehicle.odometryPathPoints.usingFallback : false
+                property string _refType: _activeVehicle ? _activeVehicle.odometryPathPoints.referenceType : ""
+                text:               _usingFallback ? qsTr("Odometry Path (%1 fallback)").arg(_refType) : qsTr("Odometry Path")
                 checked:            _activeVehicle ? _activeVehicle.odometryPathPoints.enabled : false
                 onClicked:          if (_activeVehicle) _activeVehicle.odometryPathPoints.enabled = checked
                 

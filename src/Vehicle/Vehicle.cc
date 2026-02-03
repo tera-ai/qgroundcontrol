@@ -473,9 +473,9 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
 {
     if (message.sysid != _id && message.sysid != 0) {
         // We allow RADIO_STATUS messages which come from a link the vehicle is using to pass through and be handled
-        // We also allow ODOMETRY messages from system ID 255 (sensor) or system ID 1 (fallback) to pass through
+        // We also allow ODOMETRY messages from system ID 77 (primary), 255 (fallback), or 1 (fallback) to pass through
         if (!(message.msgid == MAVLINK_MSG_ID_RADIO_STATUS && _vehicleLinkManager->containsLink(link)) &&
-            !(message.msgid == MAVLINK_MSG_ID_ODOMETRY && (message.sysid == 255 || message.sysid == 1))) {
+            !(message.msgid == MAVLINK_MSG_ID_ODOMETRY && (message.sysid == 77 || message.sysid == 255 || message.sysid == 1))) {
             return;
         }
     }
@@ -543,6 +543,9 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
     switch (message.msgid) {
     case MAVLINK_MSG_ID_HOME_POSITION:
         _handleHomePosition(message);
+        break;
+    case MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN:
+        _handleGpsGlobalOrigin(message);
         break;
     case MAVLINK_MSG_ID_HEARTBEAT:
         _handleHeartbeat(message);
@@ -809,22 +812,34 @@ void Vehicle::_handleOdometry(mavlink_message_t& message)
                         << "quality:" << odom.quality
                         << "x:" << odom.x << "y:" << odom.y << "z:" << odom.z;
     
-    // Filter: Process ODOMETRY from system ID 255 (sensor) or system ID 1 (fallback)
-    // Prefer system 255, but fall back to system 1 if 255 is not available
-    constexpr qint64 odometry255TimeoutMs = 5000; // 5 second timeout before falling back to system 1
+    // Filter: Process ODOMETRY from system ID 77 (primary), 255 (fallback), or 1 (fallback)
+    // Prefer system 77, fall back to system 255, then system 1
+    constexpr qint64 odometryTimeoutMs = 5000; // 5 second timeout before falling back to next source
     
-    if (message.sysid == 255) {
-        // Always accept from system 255 and reset the timer
+    if (message.sysid == 77) {
+        // Always accept from system 77 (primary) and reset the timer
+        _lastOdometry77Time.restart();
+    } else if (message.sysid == 255) {
+        // Only accept from system 255 if we haven't received from system 77 recently
+        if (_lastOdometry77Time.isValid() && _lastOdometry77Time.elapsed() < odometryTimeoutMs) {
+            qCDebug(VehicleLog) << "ODOMETRY ignored from system 255 - still receiving from system 77";
+            return;
+        }
+        qCDebug(VehicleLog) << "ODOMETRY using fallback from system 255";
         _lastOdometry255Time.restart();
     } else if (message.sysid == 1) {
-        // Only accept from system 1 if we haven't received from system 255 recently
-        if (_lastOdometry255Time.isValid() && _lastOdometry255Time.elapsed() < odometry255TimeoutMs) {
+        // Only accept from system 1 if we haven't received from system 77 or 255 recently
+        if (_lastOdometry77Time.isValid() && _lastOdometry77Time.elapsed() < odometryTimeoutMs) {
+            qCDebug(VehicleLog) << "ODOMETRY ignored from system 1 - still receiving from system 77";
+            return;
+        }
+        if (_lastOdometry255Time.isValid() && _lastOdometry255Time.elapsed() < odometryTimeoutMs) {
             qCDebug(VehicleLog) << "ODOMETRY ignored from system 1 - still receiving from system 255";
             return;
         }
         qCDebug(VehicleLog) << "ODOMETRY using fallback from system 1";
     } else {
-        qCDebug(VehicleLog) << "ODOMETRY ignored - not from system 255 or 1";
+        qCDebug(VehicleLog) << "ODOMETRY ignored - not from system 77, 255, or 1";
         return;
     }
     
@@ -1149,6 +1164,22 @@ void Vehicle::_handleHomePosition(mavlink_message_t& message)
                                     homePos.longitude / 10000000.0,
                                     homePos.altitude / 1000.0);
     _setHomePosition(newHomePosition);
+}
+
+void Vehicle::_handleGpsGlobalOrigin(mavlink_message_t& message)
+{
+    mavlink_gps_global_origin_t origin;
+    mavlink_msg_gps_global_origin_decode(&message, &origin);
+
+    QGeoCoordinate newEkfOrigin(origin.latitude / 10000000.0,
+                                origin.longitude / 10000000.0,
+                                origin.altitude / 1000.0);
+    
+    if (newEkfOrigin != _ekfOrigin) {
+        _ekfOrigin = newEkfOrigin;
+        qCDebug(VehicleLog) << "EKF Origin updated:" << _ekfOrigin;
+        emit ekfOriginChanged(_ekfOrigin);
+    }
 }
 
 void Vehicle::_updateArmed(bool armed)

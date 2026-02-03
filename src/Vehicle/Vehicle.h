@@ -137,6 +137,7 @@ public:
     Q_PROPERTY(QGeoCoordinate       coordinate                  READ coordinate                                                     NOTIFY coordinateChanged)
     Q_PROPERTY(QGeoCoordinate       homePosition                READ homePosition                                                   NOTIFY homePositionChanged)
     Q_PROPERTY(QGeoCoordinate       armedPosition               READ armedPosition                                                  NOTIFY armedPositionChanged)
+    Q_PROPERTY(QGeoCoordinate       ekfOrigin                   READ ekfOrigin                                                      NOTIFY ekfOriginChanged)
     Q_PROPERTY(bool                 armed                       READ armed                      WRITE setArmedShowError             NOTIFY armedChanged)
     Q_PROPERTY(bool                 autoDisarm                  READ autoDisarm                                                     NOTIFY autoDisarmChanged)
     Q_PROPERTY(bool                 flightModeSetAvailable      READ flightModeSetAvailable                                         CONSTANT)
@@ -464,6 +465,7 @@ public:
 
 
     QGeoCoordinate homePosition();
+    QGeoCoordinate ekfOrigin() const { return _ekfOrigin; }
 
     bool armed              () const{ return _armed; }
     void setArmed           (bool armed, bool showError);
@@ -809,6 +811,7 @@ signals:
     void coordinateChanged              (QGeoCoordinate coordinate);
     void mavlinkMessageReceived         (const mavlink_message_t& message);
     void homePositionChanged            (const QGeoCoordinate& homePosition);
+    void ekfOriginChanged               (const QGeoCoordinate& ekfOrigin);
     void armedPositionChanged();
     void armedChanged                   (bool armed);
     void flightModeChanged              (const QString& flightMode);
@@ -932,6 +935,7 @@ private:
 void _activeVehicleChanged          (Vehicle* newActiveVehicle);
     void _handlePing                    (LinkInterface* link, mavlink_message_t& message);
     void _handleHomePosition            (mavlink_message_t& message);
+    void _handleGpsGlobalOrigin         (mavlink_message_t& message);
     void _handleHeartbeat               (mavlink_message_t& message);
     void _handleCurrentMode             (mavlink_message_t& message);
     void _handleRadioStatus             (mavlink_message_t& message);
@@ -1006,6 +1010,7 @@ void _activeVehicleChanged          (Vehicle* newActiveVehicle);
     QGeoCoordinate  _coordinate;
     QGeoCoordinate  _homePosition;
     QGeoCoordinate  _armedPosition;
+    QGeoCoordinate  _ekfOrigin;
 
     qreal           _initialGCSPressure = 0.;
     qreal           _initialGCSTemperature = 0.;
@@ -1083,7 +1088,8 @@ void _activeVehicleChanged          (Vehicle* newActiveVehicle);
     TrajectoryPoints*               _trajectoryPoints = nullptr;
     GpsPathPoints*                  _gpsPathPoints = nullptr;
     OdometryPathPoints*             _odometryPathPoints = nullptr;
-    QElapsedTimer                   _lastOdometry255Time; ///< Tracks when we last received ODOMETRY from system 255
+    QElapsedTimer                   _lastOdometry77Time;  ///< Tracks when we last received ODOMETRY from system 77 (primary)
+    QElapsedTimer                   _lastOdometry255Time; ///< Tracks when we last received ODOMETRY from system 255 (fallback)
     QmlObjectListModel              _cameraTriggerPoints;
     //QMap<QString, ADSBVehicle*>     _trafficVehicleMap;
 
