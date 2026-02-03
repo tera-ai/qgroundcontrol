@@ -5,6 +5,9 @@
 
 include(CMakeDependentOption)
 
+# Load centralized build configuration from .github/build-config.json
+include(BuildConfig)
+
 # ============================================================================
 # Application Metadata
 # ============================================================================
@@ -40,6 +43,15 @@ cmake_dependent_option(QGC_ENABLE_COVERAGE "Enable code coverage instrumentation
 option(QGC_UTM_ADAPTER "Enable UTM (Unmanned Traffic Management) Adapter" OFF)
 option(QGC_VIEWER3D "Enable 3D Viewer (requires Qt Quick 3D)" ON)
 
+# ============================================================================
+# Compression Format Options
+# ============================================================================
+# Core formats (gzip, xz, zstd, zip) are always enabled.
+# These optional formats are rarely used in the drone ecosystem.
+
+option(QGC_ENABLE_BZIP2 "Enable BZip2 decompression support" OFF)
+option(QGC_ENABLE_LZ4 "Enable LZ4 decompression support" OFF)
+
 # MAVLink Inspector is disabled by default due to GPL licensing of QtCharts
 # option(QGC_DISABLE_MAVLINK_INSPECTOR "Disable MAVLink Inspector" OFF)
 
@@ -62,18 +74,11 @@ cmake_dependent_option(QGC_CUSTOM_GST_PACKAGE "Use QGC-provided GStreamer packag
 option(QGC_ENABLE_QT_VIDEOSTREAMING "Enable QtMultimedia video backend" OFF)
 
 # ============================================================================
-# Joystick/Input Configuration
-# ============================================================================
-
-# Example custom SDL game controller mapping:
-# set(SDL_GAMECONTROLLERCONFIG "0300000009120000544f000011010000,OpenTX Radiomaster TX16S,leftx:a3,lefty:a2,rightx:a0,righty:a1,platform:Linux" CACHE STRING "Custom SDL mappings")
-
-# ============================================================================
 # MAVLink Configuration
 # ============================================================================
 
 set(QGC_MAVLINK_GIT_REPO "https://github.com/mavlink/mavlink.git" CACHE STRING "MAVLink repository URL")
-set(QGC_MAVLINK_GIT_TAG "dd17c1a65de7b9ad8dd6e3491a8690c0d0b27ba1" CACHE STRING "MAVLink repository commit/tag")
+set(QGC_MAVLINK_GIT_TAG "b1fb5a1a32c41c6e46fea70600d626a0b5a8edbe" CACHE STRING "MAVLink repository commit/tag")
 set(QGC_MAVLINK_DIALECT "all" CACHE STRING "MAVLink dialect")
 set(QGC_MAVLINK_VERSION "2.0" CACHE STRING "MAVLink protocol version")
 
@@ -138,8 +143,8 @@ set(QGC_WINDOWS_RESOURCE_FILE_PATH "${CMAKE_SOURCE_DIR}/deploy/windows/QGroundCo
 # Qt Configuration
 # ============================================================================
 
-set(QGC_QT_MINIMUM_VERSION "6.10.0" CACHE STRING "Minimum supported Qt version")
-set(QGC_QT_MAXIMUM_VERSION "6.10.1" CACHE STRING "Maximum supported Qt version")
+set(QGC_QT_MINIMUM_VERSION "${QGC_CONFIG_QT_MINIMUM_VERSION}" CACHE STRING "Minimum supported Qt version")
+set(QGC_QT_MAXIMUM_VERSION "${QGC_CONFIG_QT_VERSION}" CACHE STRING "Maximum supported Qt version")
 
 set(QT_QML_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/qml" CACHE PATH "QML output directory")
 set(QML_IMPORT_PATH "${QT_QML_OUTPUT_DIRECTORY}" CACHE STRING "Additional QML import paths")

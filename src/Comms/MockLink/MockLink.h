@@ -1,12 +1,3 @@
-/****************************************************************************
- *
- * (c) 2009-2024 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
- *
- * QGroundControl is licensed according to the terms in the file
- * COPYING.md in the root of the source code directory.
- *
- ****************************************************************************/
-
 #pragma once
 
 #include "PX4/px4_custom_mode.h"
@@ -53,8 +44,6 @@ public:
 
     int vehicleId() const { return _vehicleSystemId; }
     MAV_AUTOPILOT getFirmwareType() const { return _firmwareType; }
-
-    void emitRemoteControlChannelRawChanged(int channel, uint16_t raw);
 
     /// Sends the specified mavlink message to QGC
     void respondWithMavlinkMessage(const mavlink_message_t &msg);
@@ -272,6 +261,8 @@ private:
 
     int _currentParamRequestListComponentIndex = -1;    ///< Current component index for param request list workflow, -1 for no request in progress
     int _currentParamRequestListParamIndex = -1;        ///< Current parameter index for param request list workflow
+    QList<int> _paramRequestListComponentIds;           ///< Cached component IDs for param list iteration (avoids repeated keys() calls)
+    QStringList _paramRequestListParamNames;            ///< Cached param names for current component (avoids repeated keys() calls)
 
     // Mavlink standard modes worker information
     int _availableModesWorkerNextModeIndex = 0;         ///< 0: not active, +index: next mode the send in sequence, -index: send a single mode (indices are 1-based)
@@ -304,7 +295,7 @@ private:
     static constexpr int _numberOfVehicles = 5;     ///< Number of ADS-B vehicles
     double _adsbAngles[_numberOfVehicles]{};        ///< Array for angles of each vehicle
 
-    static int _nextVehicleSystemId;
+    static std::atomic<int> _nextVehicleSystemId;
 
     // Vehicle position is set close to default Gazebo vehicle location. This allows for multi-vehicle
     // testing of a gazebo vehicle and a mocklink vehicle

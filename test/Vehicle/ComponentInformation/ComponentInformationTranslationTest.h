@@ -1,19 +1,9 @@
-/****************************************************************************
- *
- * (c) 2021 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
- *
- * QGroundControl is licensed according to the terms in the file
- * COPYING.md in the root of the source code directory.
- *
- ****************************************************************************/
-
-
 #pragma once
 
-#include "UnitTest.h"
-
-#include <QtCore/QJsonDocument>
 #include <QtCore/QByteArray>
+#include <QtCore/QJsonDocument>
+
+#include "UnitTest.h"
 
 class ComponentInformationTranslationTest : public UnitTest
 {
@@ -25,6 +15,7 @@ public:
 
 private slots:
     void _basic_test();
+
 private:
     void readJson(const QByteArray& bytes, QJsonDocument& jsonDoc);
 };

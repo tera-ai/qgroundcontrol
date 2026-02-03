@@ -1,12 +1,3 @@
-/****************************************************************************
- *
- * (c) 2009-2024 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
- *
- * QGroundControl is licensed according to the terms in the file
- * COPYING.md in the root of the source code directory.
- *
- ****************************************************************************/
-
 #include "GimbalController.h"
 #include "GimbalControllerSettings.h"
 #include "MAVLinkProtocol.h"
@@ -15,8 +6,9 @@
 #include "QmlObjectListModel.h"
 #include "SettingsManager.h"
 #include "Vehicle.h"
-
-#include <QtGui/QQuaternion>
+#include <cmath>
+#include "Gimbal.h"
+#include "QGCCameraManager.h"
 
 QGC_LOGGING_CATEGORY(GimbalControllerLog, "Gimbal.GimbalController")
 
@@ -236,25 +228,15 @@ void GimbalController::_handleGimbalDeviceAttitudeStatus(const mavlink_message_t
     gimbal->setYawLock((attitude_status.flags & GIMBAL_DEVICE_FLAGS_YAW_LOCK) > 0);
     gimbal->_neutral = (attitude_status.flags & GIMBAL_DEVICE_FLAGS_NEUTRAL) > 0;
 
-    // Convert from QQuaternion to Euler angles. We specifically don't use mavlink_quaternion_to euler
-    // because that seems to spew NaNs for boundary conditions. Whereas QQuaternion seems to handle things
-    // more cleanly.
-    QQuaternion q(
-        attitude_status.q[0],
-        attitude_status.q[1],
-        attitude_status.q[2],
-        attitude_status.q[3]);
-    auto vector3D = q.toEulerAngles();
-    float roll = vector3D.z();
-    float pitch = vector3D.y();
-    float yaw = vector3D.x();
+    float roll, pitch, yaw;
+    mavlink_quaternion_to_euler(attitude_status.q, &roll, &pitch, &yaw);
 
-    gimbal->setAbsoluteRoll(roll);
-    gimbal->setAbsolutePitch(pitch);
+    gimbal->setAbsoluteRoll(qRadiansToDegrees(roll));
+    gimbal->setAbsolutePitch(qRadiansToDegrees(pitch));
 
     const bool yaw_in_vehicle_frame = _yawInVehicleFrame(attitude_status.flags);
     if (yaw_in_vehicle_frame) {
-        const float bodyYaw = yaw;
+        const float bodyYaw = qRadiansToDegrees(yaw);
         float absoluteYaw = bodyYaw + _vehicle->heading()->rawValue().toFloat();
         if (absoluteYaw > 180.0f) {
             absoluteYaw -= 360.0f;
@@ -264,7 +246,7 @@ void GimbalController::_handleGimbalDeviceAttitudeStatus(const mavlink_message_t
         gimbal->setAbsoluteYaw(absoluteYaw);
 
     } else {
-        const float absoluteYaw = yaw;
+        const float absoluteYaw = qRadiansToDegrees(yaw);
         float bodyYaw = absoluteYaw - _vehicle->heading()->rawValue().toFloat();
         if (bodyYaw < -180.0f) {
             bodyYaw += 360.0f;
@@ -601,6 +583,62 @@ void GimbalController::sendRate()
     } else {
         _rateSenderTimer.start();
     }
+}
+
+void GimbalController::sendGimbalRate(float pitch_rate_deg_s, float yaw_rate_deg_s)
+{
+    if (!_tryGetGimbalControl()) {
+        return;
+    }
+
+    _sendGimbalAttitudeRates(pitch_rate_deg_s, yaw_rate_deg_s);
+
+    if (pitch_rate_deg_s == 0.f && yaw_rate_deg_s == 0.f) {
+        _rateSenderTimer.stop();
+    } else {
+        _rateSenderTimer.start();
+    }
+}
+
+void GimbalController::_sendGimbalAttitudeRates(float pitch_rate_deg_s,
+                                                float yaw_rate_deg_s)
+{
+
+    auto sharedLink = _vehicle->vehicleLinkManager()->primaryLink().lock();
+    if (!sharedLink) {
+        qCDebug(GimbalControllerLog) << "_sendGimbalAttitudeRates: primary link gone!";
+        return;
+    }
+
+    uint32_t flags =
+        GIMBAL_MANAGER_FLAGS_ROLL_LOCK |
+        GIMBAL_MANAGER_FLAGS_PITCH_LOCK |
+        GIMBAL_MANAGER_FLAGS_YAW_IN_VEHICLE_FRAME;   // use vehicle/body frame
+
+    // Preserve current yaw-lock state instead of changing it:
+    if (_activeGimbal->yawLock()) {
+        flags |= GIMBAL_MANAGER_FLAGS_YAW_LOCK;
+    }
+
+    const float qnan[4] = {NAN, NAN, NAN, NAN};
+    mavlink_message_t msg;
+
+    mavlink_msg_gimbal_manager_set_attitude_pack_chan(
+        MAVLinkProtocol::instance()->getSystemId(),
+        MAVLinkProtocol::getComponentId(),
+        sharedLink->mavlinkChannel(),
+        &msg,
+        _vehicle->id(),
+        static_cast<uint8_t>(_activeGimbal->managerCompid()->rawValue().toUInt()),
+        flags,
+        static_cast<uint8_t>(_activeGimbal->deviceId()->rawValue().toUInt()),
+        qnan,
+        NAN,
+        qDegreesToRadians(pitch_rate_deg_s),
+        qDegreesToRadians(yaw_rate_deg_s)
+    );
+
+    _vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
 }
 
 void GimbalController::_rateSenderTimeout()

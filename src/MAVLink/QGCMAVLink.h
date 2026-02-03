@@ -1,12 +1,3 @@
-/****************************************************************************
- *
- * (c) 2009-2024 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
- *
- * QGroundControl is licensed according to the terms in the file
- * COPYING.md in the root of the source code directory.
- *
- ****************************************************************************/
-
 #pragma once
 
 #include <QtCore/QList>
@@ -140,9 +131,9 @@ public:
     Q_ENUM(MavlinkSysStatus)
 
     enum GripperActions {
-        GripperActionOpen     = GRIPPER_ACTION_OPEN,
-        GripperActionClose    = GRIPPER_ACTION_CLOSE,
-        GripperActionStop     = GRIPPER_ACTION_STOP,
+        GripperActionRelease  = GRIPPER_ACTION_RELEASE,
+        GripperActionGrab     = GRIPPER_ACTION_GRAB,
+        GripperActionHold     = GRIPPER_ACTION_HOLD,
         GripperOptionInvalid  = GRIPPER_ACTIONS_ENUM_END,
     };
     Q_ENUM(GripperActions)

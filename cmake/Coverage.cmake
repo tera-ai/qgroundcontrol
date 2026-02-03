@@ -1,30 +1,52 @@
-# Code coverage configuration for QGroundControl
-# Enabled via: cmake -DQGC_ENABLE_COVERAGE=ON -DCMAKE_BUILD_TYPE=Debug
+# ============================================================================
+# Code Coverage Configuration
+# ============================================================================
+# Provides coverage-report target for CI integration.
+# Requires gcov/lcov and debug build with coverage flags.
 
-if(NOT QGC_ENABLE_COVERAGE)
+if(NOT QGC_BUILD_TESTING)
     return()
 endif()
 
-if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-    message(WARNING "Code coverage requires Debug build, but CMAKE_BUILD_TYPE is ${CMAKE_BUILD_TYPE}")
-    return()
+# Check if coverage tools are available
+find_program(GCOV_PATH gcov)
+find_program(LCOV_PATH lcov)
+find_program(GENHTML_PATH genhtml)
+
+# Only enable coverage on Debug builds with GCC/Clang
+set(_coverage_supported FALSE)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        if(GCOV_PATH AND LCOV_PATH AND GENHTML_PATH)
+            set(_coverage_supported TRUE)
+        endif()
+    endif()
 endif()
 
-message(STATUS "Code coverage instrumentation enabled")
+if(_coverage_supported)
+    message(STATUS "Code coverage: enabled (gcov + lcov)")
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    message(STATUS "Using GCC coverage (gcov/lcov)")
-    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE --coverage -O0 -g)
-    target_link_options(${CMAKE_PROJECT_NAME} PRIVATE --coverage)
+    # Add coverage flags
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} --coverage -fprofile-arcs -ftest-coverage")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} --coverage -fprofile-arcs -ftest-coverage")
+    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} --coverage")
 
-elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    message(STATUS "Using Clang source-based coverage (llvm-cov)")
-    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -fprofile-instr-generate -fcoverage-mapping -O0 -g)
-    target_link_options(${CMAKE_PROJECT_NAME} PRIVATE -fprofile-instr-generate)
-
-elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-    message(WARNING "Code coverage not supported for MSVC. Use Visual Studio Enterprise or OpenCppCoverage.")
-
+    # Coverage report target
+    add_custom_target(coverage-report
+        COMMAND ${LCOV_PATH} --capture --directory . --output-file coverage.info --ignore-errors mismatch
+        COMMAND ${LCOV_PATH} --remove coverage.info '/usr/*' '*/Qt/*' '*/test/*' '*/build/*' --output-file coverage.info
+        COMMAND ${GENHTML_PATH} coverage.info --output-directory coverage-report
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Generating code coverage report..."
+        VERBATIM
+    )
 else()
-    message(WARNING "Code coverage not supported for compiler: ${CMAKE_CXX_COMPILER_ID}")
+    message(STATUS "Code coverage: disabled (missing tools or not Debug build)")
+
+    # Provide a no-op target so CI doesn't fail
+    add_custom_target(coverage-report
+        COMMAND ${CMAKE_COMMAND} -E echo "Coverage report skipped - not configured"
+        COMMENT "Coverage report not available"
+        VERBATIM
+    )
 endif()

@@ -1,13 +1,4 @@
-﻿/****************************************************************************
- *
- * (c) 2009-2024 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
- *
- * QGroundControl is licensed according to the terms in the file
- * COPYING.md in the root of the source code directory.
- *
- ****************************************************************************/
-
-#include "FirmwareUpgradeController.h"
+﻿#include "FirmwareUpgradeController.h"
 #include "PX4FirmwareUpgradeThread.h"
 #include "Bootloader.h"
 #include "QGCApplication.h"
@@ -16,7 +7,6 @@
 #include "QGCCorePlugin.h"
 #include "FirmwareUpgradeSettings.h"
 #include "SettingsManager.h"
-#include "QGCZlib.h"
 #include "JsonHelper.h"
 #include "LinkManager.h"
 #include "MultiVehicleManager.h"
@@ -91,6 +81,7 @@ static QMap<int, QString> px4_board_name_map {
     {1058, "holybro_kakuteh7mini_default"},
     {1105, "holybro_kakuteh7-wing_default"},
     {1110, "jfb_jfb110_default"},
+    {1200, "jfb_jfb200_default"},
     {1123, "siyi_n7_default"},
     {1124, "3dr_ctrl-zero-h7-oem-revg_default"},
     {5600, "zeroone_x6_default"},
@@ -652,7 +643,8 @@ void FirmwareUpgradeController::_downloadArduPilotManifest(void)
 
     QGCFileDownload* downloader = new QGCFileDownload(this);
     connect(downloader, &QGCFileDownload::downloadComplete, this, &FirmwareUpgradeController::_ardupilotManifestDownloadComplete);
-    downloader->download(QStringLiteral("https://firmware.ardupilot.org/manifest.json.gz"));
+    // Use autoDecompress to stream-decompress directly during download
+    downloader->download(QStringLiteral("https://firmware.ardupilot.org/manifest.json.gz"), {}, true);
 }
 
 void FirmwareUpgradeController::_ardupilotManifestDownloadComplete(QString remoteFile, QString localFile, QString errorMsg)
@@ -663,15 +655,10 @@ void FirmwareUpgradeController::_ardupilotManifestDownloadComplete(QString remot
 
         qCDebug(FirmwareUpgradeLog) << "_ardupilotManifestDownloadFinished" << remoteFile << localFile;
 
-        QString jsonFileName(QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation)).absoluteFilePath("ArduPilot.Manifest.json"));
-        if (!QGCZlib::inflateGzipFile(localFile, jsonFileName)) {
-            qCWarning(FirmwareUpgradeLog) << "Inflate of compressed manifest failed" << localFile;
-            return;
-        }
-
+        // localFile is already decompressed (autoDecompress=true streams directly to .json)
         QString         errorString;
         QJsonDocument   doc;
-        if (!JsonHelper::isJsonFile(jsonFileName, doc, errorString)) {
+        if (!JsonHelper::isJsonFile(localFile, doc, errorString)) {
             qCWarning(FirmwareUpgradeLog) << "Json file read failed" << errorString;
             return;
         }

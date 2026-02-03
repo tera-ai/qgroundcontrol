@@ -1,25 +1,17 @@
-/****************************************************************************
- *
- * (c) 2009-2024 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
- *
- * QGroundControl is licensed according to the terms in the file
- * COPYING.md in the root of the source code directory.
- *
- ****************************************************************************/
-
 #include "MAVLinkProtocol.h"
+#include "AppSettings.h"
 #include "LinkManager.h"
+#include "MavlinkSettings.h"
 #include "MultiVehicleManager.h"
 #include "QGCApplication.h"
+#include "QGCFileHelper.h"
 #include "QGCLoggingCategory.h"
-#include "QGCTemporaryFile.h"
-#include "SettingsManager.h"
-#include "MavlinkSettings.h"
-#include "AppSettings.h"
 #include "QmlObjectListModel.h"
+#include "SettingsManager.h"
 
 #include <QtCore/QApplicationStatic>
 #include <QtCore/QDir>
+#include <QtCore/QFile>
 #include <QtCore/QFileInfo>
 #include <QtCore/QMetaType>
 #include <QtCore/QSettings>
@@ -32,7 +24,7 @@ Q_APPLICATION_STATIC(MAVLinkProtocol, _mavlinkProtocolInstance);
 
 MAVLinkProtocol::MAVLinkProtocol(QObject *parent)
     : QObject(parent)
-    , _tempLogFile(new QGCTemporaryFile(QStringLiteral("%2.%3").arg(_tempLogFileTemplate, _logFileExtension), this))
+    , _tempLogFile(new QFile(this))
 {
     qCDebug(MAVLinkProtocolLog) << this;
 }
@@ -110,7 +102,10 @@ void MAVLinkProtocol::receiveBytes(LinkInterface *link, const QByteArray &data)
             continue;
         }
 
-        if (status.flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1) {
+        // It's ok to get v1 HEARTBEAT messages on a v2 link:
+        //  PX4 defaults to sending V1 then switches to V2 after receiving a V2 message from GCS
+        //  ArduPilot always sends both versions
+        if (message.msgid != MAVLINK_MSG_ID_HEARTBEAT && (status.flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1)) {
             link->reportMavlinkV1Traffic();
             continue;
         }
@@ -306,8 +301,20 @@ void MAVLinkProtocol::_startLogging()
         return;
     }
 
-    if (!_tempLogFile->open()) {
-        const QString message = QStringLiteral("Opening Flight Data file for writing failed. Unable to write to %1. Please choose a different file location.").arg(_tempLogFile->fileName());
+    // Generate unique temp file path for this logging session
+    const QString logPath = QGCFileHelper::uniqueTempPath(
+        QStringLiteral("%1.%2").arg(_tempLogFileTemplate, _logFileExtension));
+    if (logPath.isEmpty()) {
+        qCWarning(MAVLinkProtocolLog) << "Failed to generate temp log path";
+        _logSuspendError = true;
+        return;
+    }
+
+    _tempLogFile->setFileName(logPath);
+    if (!_tempLogFile->open(QIODevice::WriteOnly)) {
+        const QString message = QStringLiteral("Opening Flight Data file for writing failed. "
+            "Unable to write to %1. Please choose a different file location.")
+            .arg(_tempLogFile->fileName());
         qgcApp()->showAppMessage(message, getName());
         _closeLogFile();
         _logSuspendError = true;

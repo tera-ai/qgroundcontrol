@@ -1,12 +1,3 @@
-/****************************************************************************
- *
- * (c) 2009-2020 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
- *
- * QGroundControl is licensed according to the terms in the file
- * COPYING.md in the root of the source code directory.
- *
- ****************************************************************************/
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
@@ -15,8 +6,6 @@ import QtQuick.Layouts
 import QGroundControl
 import QGroundControl.Controls
 import QGroundControl.FactControls
-
-
 
 SettingsPage {
     property var _linkManager:          QGroundControl.linkManager
@@ -271,13 +260,20 @@ SettingsPage {
 
                 Loader {
                     id:     linkSettingsLoader
-                    source: subEditConfig.settingsURL
+                    source: editingConfig && editingConfig.settingsURL ? editingConfig.settingsURL : ""
+                    asynchronous: true
 
                     property var subEditConfig:         editingConfig
                     property int _firstColumnWidth:     ScreenTools.defaultFontPixelWidth * 12
                     property int _secondColumnWidth:    ScreenTools.defaultFontPixelWidth * 30
                     property int _rowSpacing:           ScreenTools.defaultFontPixelHeight / 2
                     property int _colSpacing:           ScreenTools.defaultFontPixelWidth / 2
+
+                    onStatusChanged: {
+                        if (status === Loader.Error) {
+                            console.warn("Failed to load link settings page:", source)
+                        }
+                    }
                 }
             }
         }

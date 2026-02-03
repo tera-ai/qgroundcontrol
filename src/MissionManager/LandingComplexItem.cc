@@ -1,12 +1,3 @@
-/****************************************************************************
- *
- * (c) 2009-2024 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
- *
- * QGroundControl is licensed according to the terms in the file
- * COPYING.md in the root of the source code directory.
- *
- ****************************************************************************/
-
 #include "LandingComplexItem.h"
 #include "QGCApplication.h"
 #include "JsonHelper.h"
@@ -641,6 +632,19 @@ void LandingComplexItem::setDirty(bool dirty)
 void LandingComplexItem::_setDirty(void)
 {
     setDirty(true);
+}
+
+void LandingComplexItem::setCoordinate(const QGeoCoordinate& coordinate) {
+    if (!_landingCoordSet) {
+        setLandingCoordinate(coordinate);
+        return;
+    }
+
+    // Move entire complex item, preserving heading and distance
+    _ignoreRecalcSignals = true;
+    setLandingCoordinate(coordinate);
+    _ignoreRecalcSignals = false;
+    _recalcFromHeadingAndDistanceChange();
 }
 
 void LandingComplexItem::setSequenceNumber(int sequenceNumber)

@@ -36,11 +36,12 @@ add_subdirectory(Camera)
 add_subdirectory(Comms)
 add_subdirectory(FactSystem)
 add_subdirectory(FirmwarePlugin)
-add_subdirectory(FlightDisplay)
+add_subdirectory(FlyView)
 add_subdirectory(FlightMap)
 add_subdirectory(FollowMe)
 add_subdirectory(Gimbal)
 add_subdirectory(GPS)
+add_subdirectory(Utilities)
 add_subdirectory(Joystick)
 add_subdirectory(MAVLink)
 add_subdirectory(MissionManager)
@@ -49,7 +50,6 @@ add_subdirectory(QmlControls)
 add_subdirectory(Settings)
 add_subdirectory(Terrain)
 add_subdirectory(UI)
-add_subdirectory(Utilities)
 add_subdirectory(UTMSP)
 add_subdirectory(Vehicle)
 add_subdirectory(VideoManager)
@@ -73,14 +73,6 @@ target_sources(${CMAKE_PROJECT_NAME}
         QGCApplication.h
 )
 
-# Platform-specific sources
-if(NOT ANDROID AND NOT IOS)
-    target_sources(${CMAKE_PROJECT_NAME}
-        PRIVATE
-            RunGuard.cc
-            RunGuard.h
-    )
-endif()
 
 # ----------------------------------------------------------------------------
 # Include Directories
@@ -103,13 +95,14 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         Qt6::Core5Compat
         Qt6::CorePrivate
         Qt6::Gui
+        Qt6::HttpServer
         Qt6::Network
         Qt6::Sensors
+        Qt6::StateMachine
         Qt6::Svg
         Qt6::TextToSpeech
         Qt6::Widgets
         Qt6::Xml
-        Qt6::StateMachine
 
         # Qt6 QML/Quick
         Qt6::Qml
@@ -134,7 +127,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         AutoPilotPluginsCommonModule
         FactControlsModule
         FirstRunPromptDialogsModule
-        FlightDisplayModule
+        FlyViewModule
         FlightMapModule
         QGroundControlControlsModule
         QGroundControlModule
@@ -200,12 +193,6 @@ else()
             $<$<BOOL:${QGC_DEBUG_QML}>:QT_QML_DEBUG>
     )
 endif()
-
-# ============================================================================
-# Code Coverage Configuration
-# ============================================================================
-
-include(Coverage)
 
 # ============================================================================
 # Target Properties
