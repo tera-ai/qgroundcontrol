@@ -56,7 +56,7 @@ public:
     int estimatorPropagation(void) const { return Propagation; }
 
 signals:
-    void pointAdded(QGeoCoordinate coordinate);
+    void pointAdded(QGeoCoordinate coordinate, int estimatorType);
     void lastPointChanged();
     void estimatorTypeChanged();
     void pointsCleared(void);

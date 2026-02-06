@@ -116,7 +116,7 @@ void OdometryPathPoints::addOdometryPoint(double x, double y, double z, int esti
     }
 
     qDebug() << "Odometry Path point added:" << coordinate << "from NED:" << x << y << z << "estimator:" << estimatorType << "Total:" << _points.size();
-    emit pointAdded(coordinate);
+    emit pointAdded(coordinate, estimatorType);
     emit lastPointChanged();
 }
 

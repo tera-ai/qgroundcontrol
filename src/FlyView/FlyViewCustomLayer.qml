@@ -127,7 +127,7 @@ Item {
                             var ctx = getContext("2d")
                             ctx.reset()
                             var cx = width / 2, cy = height / 2, r = width / 2 - 1
-                            ctx.fillStyle = "#00E676"
+                            ctx.fillStyle = "#B0B0B0"
                             ctx.strokeStyle = "#536DFF"; ctx.lineWidth = 1.5
                             ctx.beginPath()
                             ctx.moveTo(cx, cy - r)

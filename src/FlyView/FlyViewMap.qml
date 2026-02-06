@@ -303,23 +303,63 @@ FlightMap {
             target:                 QGroundControl.multiVehicleManager
             function onActiveVehicleChanged(activeVehicle) {
                 odometryPathPolyline.path = _activeVehicle && _activeVehicle.odometryPathPoints.enabled ? _activeVehicle.odometryPathPoints.list() : []
+                odomEstimatorDotsModel.clear()
             }
         }
 
         Connections {
             target:                             _activeVehicle ? _activeVehicle.odometryPathPoints : null
-            function onPointAdded(coordinate) { 
+            function onPointAdded(coordinate, estimatorType) {
                 if (odometryPathPolyline.visible) {
-                    odometryPathPolyline.addCoordinate(coordinate) 
+                    odometryPathPolyline.addCoordinate(coordinate)
+                }
+                odomEstimatorDotsModel.append({ "lat": coordinate.latitude, "lon": coordinate.longitude, "estType": estimatorType })
+                if (odomEstimatorDotsModel.count > 600) {
+                    odomEstimatorDotsModel.remove(0)
                 }
             }
-            function onPointsCleared() { odometryPathPolyline.path = [] }
+            function onPointsCleared() {
+                odometryPathPolyline.path = []
+                odomEstimatorDotsModel.clear()
+            }
             function onEnabledChanged() {
                 if (_activeVehicle && _activeVehicle.odometryPathPoints.enabled) {
                     odometryPathPolyline.path = _activeVehicle.odometryPathPoints.list()
                 } else {
                     odometryPathPolyline.path = []
+                    odomEstimatorDotsModel.clear()
                 }
+            }
+        }
+    }
+
+    // Model for estimator type dots along the odometry path
+    ListModel {
+        id: odomEstimatorDotsModel
+    }
+
+    // Colored dots on the odometry path showing estimator type history
+    //   Gold = Mapping (0), Grey = Tracking (1), Red = Propagation (2)
+    MapItemView {
+        model:   odomEstimatorDotsModel
+        visible: odometryPathPolyline.visible
+
+        delegate: MapQuickItem {
+            coordinate: QtPositioning.coordinate(model.lat, model.lon)
+            anchorPoint.x: 4
+            anchorPoint.y: 4
+            z: QGroundControl.zOrderTrajectoryLines + 0.5
+
+            sourceItem: Rectangle {
+                width:  8
+                height: 8
+                radius: 4
+                color:  model.estType === 0 ? "#FFD700" :   // Mapping = Gold
+                        model.estType === 1 ? "#B0B0B0" :   // Tracking = Grey
+                        model.estType === 2 ? "#FF5252" :   // Propagation = Red
+                                              "#FFFFFF"      // Unknown
+                border.width: 0.5
+                border.color: "#536DFF"
             }
         }
     }
@@ -328,7 +368,7 @@ FlightMap {
     //   Mapping (0) = Star, Tracking (1) = Triangle, Propagation (2) = Circle
     MapQuickItem {
         id:             odometryHeadMarker
-        z:              QGroundControl.zOrderTrajectoryLines + 1
+        z:              QGroundControl.zOrderTrajectoryLines + 2
         visible:        odometryPathPolyline.visible && _activeVehicle && _activeVehicle.odometryPathPoints.lastPoint.isValid
         coordinate:     _activeVehicle ? _activeVehicle.odometryPathPoints.lastPoint : QtPositioning.coordinate()
         anchorPoint.x:  odometryHeadShape.width / 2
@@ -373,7 +413,7 @@ FlightMap {
                     ctx.closePath()
                 } else if (estType === 1) {
                     // TRACKING - Triangle (pointing up)
-                    ctx.fillStyle = "#00E676"  // Green
+                    ctx.fillStyle = "#B0B0B0"  // Grey
                     ctx.beginPath()
                     ctx.moveTo(cx, cy - r)                                    // Top
                     ctx.lineTo(cx + r * Math.cos(Math.PI / 6), cy + r * 0.5) // Bottom-right
