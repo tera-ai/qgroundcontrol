@@ -54,7 +54,7 @@ void OdometryPathPoints::setEnabled(bool enabled)
     }
 }
 
-void OdometryPathPoints::addOdometryPoint(double x, double y, double z)
+void OdometryPathPoints::addOdometryPoint(double x, double y, double z, int estimatorType)
 {
     if (!_enabled) {
         return;
@@ -110,7 +110,12 @@ void OdometryPathPoints::addOdometryPoint(double x, double y, double z)
         _points.removeFirst();
     }
 
-    qDebug() << "Odometry Path point added:" << coordinate << "from NED:" << x << y << z << "Total:" << _points.size();
+    if (_estimatorType != estimatorType) {
+        _estimatorType = estimatorType;
+        emit estimatorTypeChanged();
+    }
+
+    qDebug() << "Odometry Path point added:" << coordinate << "from NED:" << x << y << z << "estimator:" << estimatorType << "Total:" << _points.size();
     emit pointAdded(coordinate);
     emit lastPointChanged();
 }

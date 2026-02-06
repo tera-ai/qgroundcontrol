@@ -79,6 +79,85 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }
+
+            // Estimator type legend (visible when odometry path is enabled)
+            Column {
+                visible:    _activeVehicle ? _activeVehicle.odometryPathPoints.enabled : false
+                spacing:    ScreenTools.defaultFontPixelWidth * 0.25
+                leftPadding: ScreenTools.defaultFontPixelWidth
+
+                QGCLabel {
+                    text:           qsTr("Estimator Type:")
+                    color:          "white"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                }
+
+                Row {
+                    spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                    Canvas {
+                        width: 14; height: 14
+                        anchors.verticalCenter: parent.verticalCenter
+                        onPaint: {
+                            var ctx = getContext("2d")
+                            ctx.reset()
+                            var cx = width / 2, cy = height / 2, r = width / 2 - 1
+                            var inner = r * 0.4
+                            ctx.fillStyle = "#FFD700"
+                            ctx.strokeStyle = "#536DFF"; ctx.lineWidth = 1.5
+                            ctx.beginPath()
+                            for (var i = 0; i < 8; i++) {
+                                var rad = (i % 2 === 0) ? r : inner
+                                var angle = -Math.PI / 2 + (i * Math.PI / 4)
+                                var px = cx + Math.cos(angle) * rad
+                                var py = cy + Math.sin(angle) * rad
+                                if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py)
+                            }
+                            ctx.closePath(); ctx.fill(); ctx.stroke()
+                        }
+                    }
+                    QGCLabel { text: qsTr("Mapping"); color: "white"; font.pointSize: ScreenTools.smallFontPointSize; anchors.verticalCenter: parent.verticalCenter }
+                }
+
+                Row {
+                    spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                    Canvas {
+                        width: 14; height: 14
+                        anchors.verticalCenter: parent.verticalCenter
+                        onPaint: {
+                            var ctx = getContext("2d")
+                            ctx.reset()
+                            var cx = width / 2, cy = height / 2, r = width / 2 - 1
+                            ctx.fillStyle = "#00E676"
+                            ctx.strokeStyle = "#536DFF"; ctx.lineWidth = 1.5
+                            ctx.beginPath()
+                            ctx.moveTo(cx, cy - r)
+                            ctx.lineTo(cx + r * Math.cos(Math.PI / 6), cy + r * 0.5)
+                            ctx.lineTo(cx - r * Math.cos(Math.PI / 6), cy + r * 0.5)
+                            ctx.closePath(); ctx.fill(); ctx.stroke()
+                        }
+                    }
+                    QGCLabel { text: qsTr("Tracking"); color: "white"; font.pointSize: ScreenTools.smallFontPointSize; anchors.verticalCenter: parent.verticalCenter }
+                }
+
+                Row {
+                    spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                    Canvas {
+                        width: 14; height: 14
+                        anchors.verticalCenter: parent.verticalCenter
+                        onPaint: {
+                            var ctx = getContext("2d")
+                            ctx.reset()
+                            var cx = width / 2, cy = height / 2, r = width / 2 - 1
+                            ctx.fillStyle = "#FF5252"
+                            ctx.strokeStyle = "#536DFF"; ctx.lineWidth = 1.5
+                            ctx.beginPath()
+                            ctx.arc(cx, cy, r, 0, 2 * Math.PI)
+                            ctx.closePath(); ctx.fill(); ctx.stroke()
+                        }
+                    }
+                    QGCLabel { text: qsTr("Propagation"); color: "white"; font.pointSize: ScreenTools.smallFontPointSize; anchors.verticalCenter: parent.verticalCenter }
+                }
+            }
         }
     }
 

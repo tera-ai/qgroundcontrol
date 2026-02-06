@@ -324,7 +324,8 @@ FlightMap {
         }
     }
 
-    // Odometry path head marker (star shape to indicate current position)
+    // Odometry path head marker - shape changes based on estimator type:
+    //   Mapping (0) = Star, Tracking (1) = Triangle, Propagation (2) = Circle
     MapQuickItem {
         id:             odometryHeadMarker
         z:              QGroundControl.zOrderTrajectoryLines + 1
@@ -333,43 +334,66 @@ FlightMap {
         anchorPoint.x:  odometryHeadShape.width / 2
         anchorPoint.y:  odometryHeadShape.height / 2
 
+        property int _estimatorType: _activeVehicle ? _activeVehicle.odometryPathPoints.estimatorType : -1
+
         sourceItem: Canvas {
             id:     odometryHeadShape
-            width:  16
-            height: 16
+            width:  18
+            height: 18
+
+            property int estType: odometryHeadMarker._estimatorType
+            onEstTypeChanged: requestPaint()
 
             onPaint: {
                 var ctx = getContext("2d")
                 ctx.reset()
-                
+
                 var cx = width / 2
                 var cy = height / 2
-                var outerRadius = width / 2 - 1
-                var innerRadius = outerRadius * 0.4
-                var spikes = 4
-                var rotation = -Math.PI / 2  // Start from top
+                var r = width / 2 - 1
 
-                ctx.beginPath()
-                for (var i = 0; i < spikes * 2; i++) {
-                    var radius = (i % 2 === 0) ? outerRadius : innerRadius
-                    var angle = rotation + (i * Math.PI / spikes)
-                    var x = cx + Math.cos(angle) * radius
-                    var y = cy + Math.sin(angle) * radius
-                    if (i === 0) {
-                        ctx.moveTo(x, y)
-                    } else {
-                        ctx.lineTo(x, y)
-                    }
-                }
-                ctx.closePath()
-
-                // Fill with bright color
-                ctx.fillStyle = "#FFD700"  // Gold/yellow star
-                ctx.fill()
-                
-                // Stroke with darker outline
-                ctx.strokeStyle = "#536DFF"  // Match odometry path color
                 ctx.lineWidth = 1.5
+                ctx.strokeStyle = "#536DFF"
+
+                if (estType === 0) {
+                    // MAPPING - Star (4-pointed)
+                    ctx.fillStyle = "#FFD700"  // Gold
+                    var innerRadius = r * 0.4
+                    var spikes = 4
+                    var rotation = -Math.PI / 2
+                    ctx.beginPath()
+                    for (var i = 0; i < spikes * 2; i++) {
+                        var rad = (i % 2 === 0) ? r : innerRadius
+                        var angle = rotation + (i * Math.PI / spikes)
+                        var px = cx + Math.cos(angle) * rad
+                        var py = cy + Math.sin(angle) * rad
+                        if (i === 0) ctx.moveTo(px, py)
+                        else ctx.lineTo(px, py)
+                    }
+                    ctx.closePath()
+                } else if (estType === 1) {
+                    // TRACKING - Triangle (pointing up)
+                    ctx.fillStyle = "#00E676"  // Green
+                    ctx.beginPath()
+                    ctx.moveTo(cx, cy - r)                                    // Top
+                    ctx.lineTo(cx + r * Math.cos(Math.PI / 6), cy + r * 0.5) // Bottom-right
+                    ctx.lineTo(cx - r * Math.cos(Math.PI / 6), cy + r * 0.5) // Bottom-left
+                    ctx.closePath()
+                } else if (estType === 2) {
+                    // PROPAGATION - Circle
+                    ctx.fillStyle = "#FF5252"  // Red
+                    ctx.beginPath()
+                    ctx.arc(cx, cy, r, 0, 2 * Math.PI)
+                    ctx.closePath()
+                } else {
+                    // Unknown - small filled circle
+                    ctx.fillStyle = "#FFFFFF"
+                    ctx.beginPath()
+                    ctx.arc(cx, cy, r * 0.5, 0, 2 * Math.PI)
+                    ctx.closePath()
+                }
+
+                ctx.fill()
                 ctx.stroke()
             }
         }

@@ -845,7 +845,8 @@ void Vehicle::_handleOdometry(mavlink_message_t& message)
     
     // Add odometry point to path tracking (x=north, y=east, z=down in NED frame)
     // frame_id should be MAV_FRAME_LOCAL_NED (1) or MAV_FRAME_BODY_NED (8)
-    _odometryPathPoints->addOdometryPoint(odom.x, odom.y, odom.z);
+    // estimator_type: 0=Mapping, 1=Tracking, 2=Propagation
+    _odometryPathPoints->addOdometryPoint(odom.x, odom.y, odom.z, odom.estimator_type);
 }
 
 // TODO: VehicleFactGroup
