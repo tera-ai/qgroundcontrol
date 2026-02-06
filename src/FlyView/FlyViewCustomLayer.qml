@@ -161,6 +161,129 @@ Item {
         }
     }
 
+    // GPS Raw telemetry box (above the existing bottom-right telemetry bar)
+    Rectangle {
+        id:                     gpsTelemetryPanel
+        anchors.right:          parent.right
+        anchors.bottom:         parent.bottom
+        anchors.rightMargin:    ScreenTools.defaultFontPixelWidth
+        anchors.bottomMargin:   parentToolInsets.bottomEdgeRightInset + ScreenTools.defaultFontPixelWidth
+        width:                  gpsTelemetryColumn.width + ScreenTools.defaultFontPixelWidth * 2
+        height:                 gpsTelemetryColumn.height + ScreenTools.defaultFontPixelWidth * 1.5
+        radius:                 ScreenTools.defaultFontPixelWidth * 0.5
+        color:                  Qt.rgba(0, 0, 0, 0.75)
+        visible:                _activeVehicle
+
+        property var  _gps:         _activeVehicle ? _activeVehicle.gps : null
+        property var  _gpsPath:     _activeVehicle ? _activeVehicle.gpsPathPoints : null
+        property real _gpsSpeed:    _gps ? _gps.speed.rawValue : NaN
+        property real _gpsAlt:      _gps ? _gps.alt.rawValue : NaN
+        property real _gpsDist:     _gpsPath ? _gpsPath.totalDistance : 0
+        property real _gpsDistHome: _gpsPath ? _gpsPath.distanceToHome : 0
+        property int  _gpsLock:     _gps ? _gps.lock.rawValue : 0
+        property int  _gpsSats:     _gps ? _gps.count.rawValue : 0
+
+        Column {
+            id:                 gpsTelemetryColumn
+            anchors.centerIn:   parent
+            spacing:            ScreenTools.defaultFontPixelWidth * 0.25
+
+            QGCLabel {
+                text:               qsTr("GPS Raw Telemetry")
+                color:              "#00E04B"
+                font.pointSize:     ScreenTools.smallFontPointSize
+                font.bold:          true
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+
+            // GPS Speed
+            Row {
+                spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                QGCLabel {
+                    text:           qsTr("Speed:")
+                    color:          "#AAAAAA"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                    width:          ScreenTools.defaultFontPixelWidth * 8
+                }
+                QGCLabel {
+                    text:           isNaN(gpsTelemetryPanel._gpsSpeed) ? "---" : gpsTelemetryPanel._gpsSpeed.toFixed(2) + " m/s"
+                    color:          "white"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                }
+            }
+
+            // GPS Altitude MSL
+            Row {
+                spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                QGCLabel {
+                    text:           qsTr("Alt (MSL):")
+                    color:          "#AAAAAA"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                    width:          ScreenTools.defaultFontPixelWidth * 8
+                }
+                QGCLabel {
+                    text:           isNaN(gpsTelemetryPanel._gpsAlt) ? "---" : gpsTelemetryPanel._gpsAlt.toFixed(1) + " m"
+                    color:          "white"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                }
+            }
+
+            // GPS Distance Covered
+            Row {
+                spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                QGCLabel {
+                    text:           qsTr("Dist Covr:")
+                    color:          "#AAAAAA"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                    width:          ScreenTools.defaultFontPixelWidth * 8
+                }
+                QGCLabel {
+                    text:           gpsTelemetryPanel._gpsDist < 1000
+                                        ? gpsTelemetryPanel._gpsDist.toFixed(1) + " m"
+                                        : (gpsTelemetryPanel._gpsDist / 1000.0).toFixed(2) + " km"
+                    color:          "white"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                }
+            }
+
+            // GPS Distance to Home
+            Row {
+                spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                QGCLabel {
+                    text:           qsTr("Dist Home:")
+                    color:          "#AAAAAA"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                    width:          ScreenTools.defaultFontPixelWidth * 8
+                }
+                QGCLabel {
+                    text:           gpsTelemetryPanel._gpsDistHome < 1000
+                                        ? gpsTelemetryPanel._gpsDistHome.toFixed(1) + " m"
+                                        : (gpsTelemetryPanel._gpsDistHome / 1000.0).toFixed(2) + " km"
+                    color:          "white"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                }
+            }
+
+            // GPS Fix + Sats
+            Row {
+                spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                QGCLabel {
+                    text:           qsTr("Fix/Sats:")
+                    color:          "#AAAAAA"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                    width:          ScreenTools.defaultFontPixelWidth * 8
+                }
+                QGCLabel {
+                    property var _lockNames: ["None", "No Fix", "2D", "3D", "DGPS", "RTK Float", "RTK Fixed", "Static"]
+                    text:           (gpsTelemetryPanel._gpsLock >= 0 && gpsTelemetryPanel._gpsLock < _lockNames.length
+                                        ? _lockNames[gpsTelemetryPanel._gpsLock] : "?") + " / " + gpsTelemetryPanel._gpsSats
+                    color:          gpsTelemetryPanel._gpsLock >= 3 ? "#00E04B" : (gpsTelemetryPanel._gpsLock >= 2 ? "#FFD700" : "#FF5252")
+                    font.pointSize: ScreenTools.smallFontPointSize
+                }
+            }
+        }
+    }
+
     // since this file is a placeholder for the custom layer in a standard build, we will just pass through the parent insets
     QGCToolInsets {
         id:                     _toolInsets
@@ -169,12 +292,12 @@ Item {
         leftEdgeBottomInset:    parentToolInsets.leftEdgeBottomInset
         rightEdgeTopInset:      parentToolInsets.rightEdgeTopInset + (pathControlPanel.visible ? pathControlPanel.width + ScreenTools.defaultFontPixelWidth * 2 : 0)
         rightEdgeCenterInset:   parentToolInsets.rightEdgeCenterInset
-        rightEdgeBottomInset:   parentToolInsets.rightEdgeBottomInset
+        rightEdgeBottomInset:   parentToolInsets.rightEdgeBottomInset + (gpsTelemetryPanel.visible ? gpsTelemetryPanel.height + ScreenTools.defaultFontPixelWidth : 0)
         topEdgeLeftInset:       parentToolInsets.topEdgeLeftInset
         topEdgeCenterInset:     parentToolInsets.topEdgeCenterInset
         topEdgeRightInset:      parentToolInsets.topEdgeRightInset + (pathControlPanel.visible ? pathControlPanel.height + ScreenTools.defaultFontPixelWidth * 2 : 0)
         bottomEdgeLeftInset:    parentToolInsets.bottomEdgeLeftInset
         bottomEdgeCenterInset:  parentToolInsets.bottomEdgeCenterInset
-        bottomEdgeRightInset:   parentToolInsets.bottomEdgeRightInset
+        bottomEdgeRightInset:   parentToolInsets.bottomEdgeRightInset + (gpsTelemetryPanel.visible ? gpsTelemetryPanel.height + ScreenTools.defaultFontPixelWidth : 0)
     }
 }

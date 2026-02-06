@@ -55,6 +55,20 @@
     "decimalPlaces":    0
 },
 {
+    "name":             "speed",
+    "shortDesc": "GPS Ground Speed",
+    "type":             "double",
+    "decimalPlaces":    2,
+    "units":            "m/s"
+},
+{
+    "name":             "alt",
+    "shortDesc": "GPS Altitude (MSL)",
+    "type":             "double",
+    "decimalPlaces":    1,
+    "units":            "m"
+},
+{
     "name":             "count",
     "shortDesc": "Sat Count",
     "type":             "uint32"

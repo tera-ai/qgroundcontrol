@@ -7,14 +7,22 @@ on:
     tags:
       - "v*" # Trigger on version tags
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 permissions:
   contents: write
   packages: write
+  id-token: write
+  attestations: write
+  actions: read
 
 jobs:
   build-windows:
     name: Build Windows ${{ matrix.package }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
 
     strategy:
       fail-fast: false
@@ -24,42 +32,51 @@ jobs:
             host: windows
             arch: win64_msvc2022_64
             package: QGroundControl-installer-AMD64
-            msvc_arch: x64
 
           - os: windows-11-arm
             host: windows_arm64
             arch: win64_msvc2022_arm64
             package: QGroundControl-installer-ARM64
-            msvc_arch: arm64
 
+          # TODO: Remove qt_version override once aqtinstall supports Qt 6.10.1+ for cross-compiled ARM64
+          # Workaround: Pin to Qt 6.10.0 until aqtinstall fix is released
+          # Tracking: https://github.com/miurahr/aqtinstall/pull/952
           - os: windows-2022
             host: windows
             arch: win64_msvc2022_arm64_cross_compiled
             package: QGroundControl-installer-AMD64-ARM64
-            msvc_arch: amd64_arm64
+            qt_version: '6.10.0'
 
     defaults:
       run:
         shell: cmd
 
-    env:
-      QT_VERSION: 6.10.0
-
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
       - name: Checkout repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           submodules: recursive
           fetch-depth: 0
+
+      - name: Get build config
+        id: config
+        uses: ./.github/actions/build-config
 
       - name: Common setup
         uses: ./.github/actions/common
 
       - name: Install GStreamer
         if: matrix.arch == 'win64_msvc2022_64'
-        uses: blinemedical/setup-gstreamer@v1
-        with:
-          version: 1.22.12
+        shell: pwsh
+        run: |
+          ./tools/setup/install-dependencies-windows.ps1 `
+            -GStreamerVersion ${{ steps.config.outputs.gstreamer_windows_version }} `
+            -SkipVulkan
 
       - name: Setup cache
         uses: ./.github/actions/cache
@@ -68,23 +85,20 @@ jobs:
           target: ${{ matrix.arch }}
           build-type: Release
           cpm-modules: ${{ runner.temp }}\build\cpm_modules
+          save-cache: ${{ github.event_name != 'pull_request' }}
 
-      - name: Install Qt ${{ env.QT_VERSION }}
-        uses: jurplel/install-qt-action@v4
+      - name: Install Qt ${{ matrix.qt_version || steps.config.outputs.qt_version }}
+        uses: ./.github/actions/qt-install
         with:
-          version: ${{ env.QT_VERSION }}
+          version: ${{ matrix.qt_version || steps.config.outputs.qt_version }}
           host: ${{ matrix.host }}
-          target: desktop
           arch: ${{ matrix.arch }}
-          dir: ${{ runner.temp }}
-          modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors qtscxml
-          setup-python: false
-          cache: true
+          modules: ${{ steps.config.outputs.qt_modules }}
 
       - name: Set up MSVC environment
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: TheMrMilchmann/setup-msvc-dev@v4
         with:
-          arch: ${{ matrix.msvc_arch }}
+          arch: ${{ (matrix.arch == 'win64_msvc2022_64' && 'x64') || (matrix.arch == 'win64_msvc2022_arm64' && 'arm64') || 'amd64_arm64' }}
 
       - name: Configure
         working-directory: ${{ runner.temp }}\build
@@ -109,25 +123,36 @@ jobs:
         run: cmake --install . --config Release
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/upload
         with:
-          name: ${{ matrix.package }}
-          path: ${{ runner.temp }}\build\${{ matrix.package }}.exe
-          retention-days: 30
+          artifact_name: ${{ matrix.package }}.exe
+          package_name: ${{ matrix.package }}
+          aws_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_distribution_id: ${{ secrets.AWS_DISTRIBUTION_ID }}
+          upload_aws: ${{ matrix.arch == 'win64_msvc2022_arm64_cross_compiled' && 'false' || 'true' }}
 
   build-macos:
     name: Build macOS Universal
-    runs-on: macos-latest
-
-    env:
-      QT_VERSION: 6.10.0
+    runs-on: macos-15
+    timeout-minutes: 120
 
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
       - name: Checkout repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           submodules: recursive
-          fetch-depth: 0
+          fetch-depth: 1
+          fetch-tags: true
+
+      - name: Get build config
+        id: config
+        uses: ./.github/actions/build-config
 
       - name: Initial Setup
         uses: ./.github/actions/common
@@ -135,11 +160,13 @@ jobs:
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "<=16.x"
+          xcode-version: ${{ steps.config.outputs.xcode_version }}
 
       - name: Install Dependencies (include GStreamer)
         working-directory: ${{ github.workspace }}/tools/setup
-        run: sh install-dependencies-osx.sh
+        env:
+          GSTREAMER_VERSION: ${{ steps.config.outputs.gstreamer_macos_version }}
+        run: sh install-dependencies-macos.sh
 
       - name: Setup Caching
         uses: ./.github/actions/cache
@@ -148,26 +175,22 @@ jobs:
           target: clang_64
           build-type: Release
           cpm-modules: ${{ runner.temp }}/build/cpm_modules
+          save-cache: ${{ github.event_name != 'pull_request' }}
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: ./.github/actions/qt-install
         with:
-          version: ${{ env.QT_VERSION }}
+          version: ${{ steps.config.outputs.qt_version }}
           host: mac
-          target: desktop
           arch: clang_64
-          dir: ${{ runner.temp }}
-          modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors qtscxml
-          setup-python: false
-          cache: true
+          modules: ${{ steps.config.outputs.qt_modules }}
 
       - name: CMake configure
         working-directory: ${{ runner.temp }}/build
-        run:
-          ${{ env.QT_ROOT_DIR }}/bin/qt-cmake -S ${{ github.workspace }} -B . -G Ninja
-          -DCMAKE_BUILD_TYPE=Release
-          -DQGC_STABLE_BUILD=${{ github.ref_type == 'tag' || contains(github.ref, 'Stable') && 'ON' || 'OFF' }}
-          -DQGC_MACOS_SIGN_WITH_IDENTITY=OFF
+        run: ${{ env.QT_ROOT_DIR }}/bin/qt-cmake -S ${{ github.workspace }} -B . -G Ninja
+              -DCMAKE_BUILD_TYPE=Release
+              -DQGC_STABLE_BUILD=${{ github.ref_type == 'tag' || contains(github.ref, 'Stable') && 'ON' || 'OFF' }}
+              -DQGC_MACOS_SIGN_WITH_IDENTITY=OFF
 
       - name: Build
         working-directory: ${{ runner.temp }}/build
@@ -178,15 +201,18 @@ jobs:
         run: cmake --install . --config Release
 
       - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/upload
         with:
-          name: QGroundControl-macOS
-          path: ${{ runner.temp }}/build/QGroundControl.dmg
-          retention-days: 30
+          artifact_name: QGroundControl.dmg
+          package_name: QGroundControl
+          aws_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_distribution_id: ${{ secrets.AWS_DISTRIBUTION_ID }}
 
   build-linux:
     name: Build Linux ${{ matrix.package }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
 
     strategy:
       fail-fast: false
@@ -206,15 +232,21 @@ jobs:
       run:
         shell: bash
 
-    env:
-      QT_VERSION: 6.10.0
-
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
       - name: Checkout repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           submodules: recursive
           fetch-depth: 0
+
+      - name: Get build config
+        id: config
+        uses: ./.github/actions/build-config
 
       - name: Initial Setup
         uses: ./.github/actions/common
@@ -231,26 +263,22 @@ jobs:
           target: ${{ matrix.arch }}
           build-type: Release
           cpm-modules: ${{ runner.temp }}/build/cpm_modules
+          save-cache: ${{ github.event_name != 'pull_request' }}
 
       - name: Install Qt for Linux
-        uses: jurplel/install-qt-action@v4
+        uses: ./.github/actions/qt-install
         with:
-          version: ${{ env.QT_VERSION }}
+          version: ${{ steps.config.outputs.qt_version }}
           host: ${{ matrix.host }}
-          target: desktop
           arch: ${{ matrix.arch }}
-          dir: ${{ runner.temp }}
-          modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors qtscxml
-          setup-python: false
-          cache: true
+          modules: ${{ steps.config.outputs.qt_modules }}
 
       - name: Configure
         working-directory: ${{ runner.temp }}/build
-        run:
-          ${{ env.QT_ROOT_DIR }}/bin/qt-cmake -S ${{ github.workspace }} -B . -G Ninja
-          -DCMAKE_BUILD_TYPE=Release
-          -DQGC_BUILD_TESTING=OFF
-          -DQGC_STABLE_BUILD=${{ github.ref_type == 'tag' || contains(github.ref, 'Stable') && 'ON' || 'OFF' }}
+        run: ${{ env.QT_ROOT_DIR }}/bin/qt-cmake -S ${{ github.workspace }} -B . -G Ninja
+              -DCMAKE_BUILD_TYPE=Release
+              -DQGC_BUILD_TESTING=OFF
+              -DQGC_STABLE_BUILD=${{ github.ref_type == 'tag' || contains(github.ref, 'Stable') && 'ON' || 'OFF' }}
 
       - name: Build
         working-directory: ${{ runner.temp }}/build
@@ -269,11 +297,13 @@ jobs:
         run: xvfb-run -a ./${{ matrix.package }}.AppImage --simple-boot-test
 
       - name: Upload Linux artifact
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/upload
         with:
-          name: ${{ matrix.package }}
-          path: ${{ runner.temp }}/build/${{ matrix.package }}.AppImage
-          retention-days: 30
+          artifact_name: ${{ matrix.package }}.AppImage
+          package_name: ${{ matrix.package }}
+          aws_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_distribution_id: ${{ secrets.AWS_DISTRIBUTION_ID }}
 
   create-release:
     name: Create GitHub Release
@@ -282,8 +312,13 @@ jobs:
     if: github.ref_type == 'tag'
 
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: artifacts
 
@@ -291,10 +326,17 @@ jobs:
         run: ls -R artifacts
 
       - name: Create Release
-        uses: ncipollo/release-action@v1
+        uses: softprops/action-gh-release@v2
         with:
-          artifacts: "artifacts/QGroundControl-installer-AMD64/QGroundControl-installer-AMD64.exe,artifacts/QGroundControl-installer-ARM64/QGroundControl-installer-ARM64.exe,artifacts/QGroundControl-installer-AMD64-ARM64/QGroundControl-installer-AMD64-ARM64.exe,artifacts/QGroundControl-macOS/QGroundControl.dmg,artifacts/QGroundControl-x86_64/QGroundControl-x86_64.AppImage,artifacts/QGroundControl-aarch64/QGroundControl-aarch64.AppImage"
-          generateReleaseNotes: true
+          files: |
+            artifacts/QGroundControl-installer-AMD64/QGroundControl-installer-AMD64.exe
+            artifacts/QGroundControl-installer-ARM64/QGroundControl-installer-ARM64.exe
+            artifacts/QGroundControl-installer-AMD64-ARM64/QGroundControl-installer-AMD64-ARM64.exe
+            artifacts/QGroundControl/QGroundControl.dmg
+            artifacts/QGroundControl-x86_64/QGroundControl-x86_64.AppImage
+            artifacts/QGroundControl-aarch64/QGroundControl-aarch64.AppImage
+          generate_release_notes: true
           draft: false
           prerelease: false
+          fail_on_unmatched_files: false
           token: ${{ secrets.GITHUB_TOKEN }}

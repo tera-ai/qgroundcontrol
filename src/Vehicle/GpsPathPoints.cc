@@ -41,6 +41,15 @@ void GpsPathPoints::addGpsRawIntPoint(QGeoCoordinate coordinate)
         return;
     }
 
+    // Accumulate total distance
+    if (_lastPoint.isValid()) {
+        double segmentDistance = _lastPoint.distanceTo(coordinate);
+        if (segmentDistance < 1000.0) { // Sanity check: skip jumps > 1km
+            _totalDistance += segmentDistance;
+            emit totalDistanceChanged();
+        }
+    }
+
     _lastPoint = coordinate;
     _points.append(QVariant::fromValue(coordinate));
 
@@ -48,7 +57,17 @@ void GpsPathPoints::addGpsRawIntPoint(QGeoCoordinate coordinate)
         _points.removeFirst();
     }
 
-    qDebug() << "GPS Path point added:" << coordinate << "Total:" << _points.size();
+    // Update distance to home
+    QGeoCoordinate home = _vehicle->homePosition();
+    if (home.isValid() && coordinate.isValid()) {
+        double newDistToHome = coordinate.distanceTo(home);
+        if (newDistToHome != _distanceToHome) {
+            _distanceToHome = newDistToHome;
+            emit distanceToHomeChanged();
+        }
+    }
+
+    qDebug() << "GPS Path point added:" << coordinate << "Total:" << _points.size() << "Distance:" << _totalDistance;
     emit pointAdded(coordinate);
 }
 
@@ -56,6 +75,10 @@ void GpsPathPoints::clear(void)
 {
     _points.clear();
     _lastPoint = QGeoCoordinate();
+    _totalDistance = 0.0;
+    _distanceToHome = 0.0;
     emit pointsCleared();
+    emit totalDistanceChanged();
+    emit distanceToHomeChanged();
 }
 

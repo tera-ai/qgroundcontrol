@@ -22,12 +22,16 @@ class GpsPathPoints : public QObject
     QML_ELEMENT
     QML_UNCREATABLE("")
     Q_PROPERTY(bool enabled READ enabled WRITE setEnabled NOTIFY enabledChanged)
+    Q_PROPERTY(double totalDistance READ totalDistance NOTIFY totalDistanceChanged)
+    Q_PROPERTY(double distanceToHome READ distanceToHome NOTIFY distanceToHomeChanged)
     
 public:
     GpsPathPoints(Vehicle* vehicle, QObject* parent = nullptr);
 
     Q_INVOKABLE QVariantList list(void) const { return _points; }
     bool enabled(void) const { return _enabled; }
+    double totalDistance(void) const { return _totalDistance; }
+    double distanceToHome(void) const { return _distanceToHome; }
     void setEnabled(bool enabled);
 
 signals:
@@ -35,6 +39,8 @@ signals:
     void updateLastPoint(QGeoCoordinate coordinate);
     void pointsCleared(void);
     void enabledChanged();
+    void totalDistanceChanged();
+    void distanceToHomeChanged();
 
 public slots:
     void clear(void);
@@ -45,6 +51,8 @@ private:
     QVariantList    _points;
     QGeoCoordinate  _lastPoint;
     bool            _enabled = false;
+    double          _totalDistance = 0.0;
+    double          _distanceToHome = 0.0;
 
     static constexpr int _maxPointCount = 600;
 };

@@ -16,6 +16,8 @@ VehicleGPSFactGroup::VehicleGPSFactGroup(QObject *parent)
     _addFact(&_vdopFact);
     _addFact(&_courseOverGroundFact);
     _addFact(&_yawFact);
+    _addFact(&_speedFact);
+    _addFact(&_altFact);
     _addFact(&_lockFact);
     _addFact(&_countFact);
     _addFact(&_systemErrorsFact);
@@ -34,6 +36,8 @@ VehicleGPSFactGroup::VehicleGPSFactGroup(QObject *parent)
     _vdopFact.setRawValue(std::numeric_limits<float>::quiet_NaN());
     _courseOverGroundFact.setRawValue(std::numeric_limits<float>::quiet_NaN());
     _yawFact.setRawValue(std::numeric_limits<int16_t>::quiet_NaN());
+    _speedFact.setRawValue(std::numeric_limits<float>::quiet_NaN());
+    _altFact.setRawValue(std::numeric_limits<float>::quiet_NaN());
     _spoofingStateFact.setRawValue(255);
     _jammingStateFact.setRawValue(255);
     _authenticationStateFact.setRawValue(255);
@@ -78,6 +82,8 @@ void VehicleGPSFactGroup::_handleGpsRawInt(const mavlink_message_t &message)
     vdop()->setRawValue((gpsRawInt.epv == UINT16_MAX) ? qQNaN() : (gpsRawInt.epv / 100.0));
     courseOverGround()->setRawValue((gpsRawInt.cog == UINT16_MAX) ? qQNaN() : (gpsRawInt.cog / 100.0));
     yaw()->setRawValue((gpsRawInt.yaw == UINT16_MAX) ? qQNaN() : (gpsRawInt.yaw / 100.0));
+    speed()->setRawValue((gpsRawInt.vel == UINT16_MAX) ? qQNaN() : (gpsRawInt.vel / 100.0));   // cm/s -> m/s
+    alt()->setRawValue(gpsRawInt.alt / 1000.0);   // mm -> m
     lock()->setRawValue(gpsRawInt.fix_type);
 
     _setTelemetryAvailable(true);
