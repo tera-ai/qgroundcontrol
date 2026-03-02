@@ -32,25 +32,28 @@ void GpsPathPoints::setEnabled(bool enabled)
 
 void GpsPathPoints::addGpsRawIntPoint(QGeoCoordinate coordinate)
 {
-    if (!_enabled) {
-        return;
-    }
-    
     if (!coordinate.isValid()) {
         qDebug() << "GPS Path: Invalid coordinate";
         return;
     }
 
+    _lastPoint = coordinate;
+    emit lastPointChanged();
+
+    if (!_enabled) {
+        return;
+    }
+
     // Accumulate total distance
-    if (_lastPoint.isValid()) {
-        double segmentDistance = _lastPoint.distanceTo(coordinate);
-        if (segmentDistance < 1000.0) { // Sanity check: skip jumps > 1km
+    if (_prevEnabledPoint.isValid()) {
+        double segmentDistance = _prevEnabledPoint.distanceTo(coordinate);
+        if (segmentDistance < 1000.0) {
             _totalDistance += segmentDistance;
             emit totalDistanceChanged();
         }
     }
 
-    _lastPoint = coordinate;
+    _prevEnabledPoint = coordinate;
     _points.append(QVariant::fromValue(coordinate));
 
     if (_points.size() > _maxPointCount) {
@@ -74,7 +77,7 @@ void GpsPathPoints::addGpsRawIntPoint(QGeoCoordinate coordinate)
 void GpsPathPoints::clear(void)
 {
     _points.clear();
-    _lastPoint = QGeoCoordinate();
+    _prevEnabledPoint = QGeoCoordinate();
     _totalDistance = 0.0;
     _distanceToHome = 0.0;
     emit pointsCleared();

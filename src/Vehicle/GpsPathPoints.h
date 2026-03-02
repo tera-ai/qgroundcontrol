@@ -22,6 +22,7 @@ class GpsPathPoints : public QObject
     QML_ELEMENT
     QML_UNCREATABLE("")
     Q_PROPERTY(bool enabled READ enabled WRITE setEnabled NOTIFY enabledChanged)
+    Q_PROPERTY(QGeoCoordinate lastPoint READ lastPoint NOTIFY lastPointChanged)
     Q_PROPERTY(double totalDistance READ totalDistance NOTIFY totalDistanceChanged)
     Q_PROPERTY(double distanceToHome READ distanceToHome NOTIFY distanceToHomeChanged)
     
@@ -30,6 +31,7 @@ public:
 
     Q_INVOKABLE QVariantList list(void) const { return _points; }
     bool enabled(void) const { return _enabled; }
+    QGeoCoordinate lastPoint(void) const { return _lastPoint; }
     double totalDistance(void) const { return _totalDistance; }
     double distanceToHome(void) const { return _distanceToHome; }
     void setEnabled(bool enabled);
@@ -37,6 +39,7 @@ public:
 signals:
     void pointAdded(QGeoCoordinate coordinate);
     void updateLastPoint(QGeoCoordinate coordinate);
+    void lastPointChanged();
     void pointsCleared(void);
     void enabledChanged();
     void totalDistanceChanged();
@@ -50,6 +53,7 @@ private:
     Vehicle*        _vehicle;
     QVariantList    _points;
     QGeoCoordinate  _lastPoint;
+    QGeoCoordinate  _prevEnabledPoint;
     bool            _enabled = false;
     double          _totalDistance = 0.0;
     double          _distanceToHome = 0.0;

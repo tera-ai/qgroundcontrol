@@ -368,6 +368,221 @@ Item {
         }
     }
 
+    // Navigation Error Panel (GPS vs Odometry)
+    Rectangle {
+        id:                     navErrorPanel
+        anchors.left:           parent.left
+        anchors.bottom:         parent.bottom
+        anchors.leftMargin:     ScreenTools.defaultFontPixelWidth
+        anchors.bottomMargin:   parentToolInsets.bottomEdgeLeftInset + ScreenTools.defaultFontPixelWidth
+        width:                  navErrorColumn.width + ScreenTools.defaultFontPixelWidth * 2
+        height:                 navErrorColumn.height + ScreenTools.defaultFontPixelWidth * 1.5
+        radius:                 ScreenTools.defaultFontPixelWidth * 0.5
+        color:                  Qt.rgba(0, 0, 0, 0.75)
+        visible:                _activeVehicle
+
+        property var  _odomPts:  _activeVehicle ? _activeVehicle.odometryPathPoints : null
+        property var  _gpsPts:   _activeVehicle ? _activeVehicle.gpsPathPoints : null
+        property var  _odomLast: _odomPts ? _odomPts.lastPoint : QtPositioning.coordinate()
+        property var  _gpsLast:  _gpsPts  ? _gpsPts.lastPoint  : QtPositioning.coordinate()
+
+        property real currentError: NaN
+        property real minError:     NaN
+        property real maxError:     NaN
+        property real avgError:     NaN
+        property int  sampleCount:  0
+        property real errorSum:     0
+        property var  errorHistory: []
+        readonly property int maxHistory: 60
+
+        on_odomLastChanged: _recomputeError()
+
+        function _recomputeError() {
+            if (!_odomLast || !_gpsLast) return
+            if (!_odomLast.isValid || !_gpsLast.isValid) return
+            var d = _gpsLast.distanceTo(_odomLast)
+            if (isNaN(d) || d > 50000) return
+
+            currentError = d
+            sampleCount++
+            errorSum += d
+            avgError = errorSum / sampleCount
+            if (isNaN(minError) || d < minError) minError = d
+            if (isNaN(maxError) || d > maxError) maxError = d
+
+            var h = errorHistory.slice()
+            h.push(d)
+            if (h.length > maxHistory) h.shift()
+            errorHistory = h
+
+            errorSparkline.requestPaint()
+        }
+
+        function _resetStats() {
+            currentError = NaN; minError = NaN; maxError = NaN; avgError = NaN
+            sampleCount = 0; errorSum = 0; errorHistory = []
+            errorSparkline.requestPaint()
+        }
+
+        Column {
+            id:                 navErrorColumn
+            anchors.centerIn:   parent
+            spacing:            ScreenTools.defaultFontPixelWidth * 0.25
+
+            QGCLabel {
+                text:               qsTr("Nav Error (GPS vs Odom)")
+                color:              "#FF9800"
+                font.pointSize:     ScreenTools.smallFontPointSize
+                font.bold:          true
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+
+            // Current error (large)
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: ScreenTools.defaultFontPixelWidth * 0.3
+                QGCLabel {
+                    text:           isNaN(navErrorPanel.currentError) ? "---" : navErrorPanel.currentError.toFixed(3)
+                    color:          navErrorPanel.currentError < 1.0 ? "#00E04B" : (navErrorPanel.currentError < 5.0 ? "#FFD700" : "#FF5252")
+                    font.pointSize: ScreenTools.mediumFontPointSize
+                    font.bold:      true
+                    anchors.baseline: errorUnitLabel.baseline
+                }
+                QGCLabel {
+                    id: errorUnitLabel
+                    text:           "m"
+                    color:          "#AAAAAA"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                }
+            }
+
+            // Min / Max / Avg row
+            Row {
+                spacing: ScreenTools.defaultFontPixelWidth
+                anchors.horizontalCenter: parent.horizontalCenter
+                Column {
+                    spacing: 1
+                    QGCLabel { text: qsTr("Min"); color: "#777777"; font.pointSize: ScreenTools.smallFontPointSize * 0.85; anchors.horizontalCenter: parent.horizontalCenter }
+                    QGCLabel { text: isNaN(navErrorPanel.minError) ? "---" : navErrorPanel.minError.toFixed(2) + " m"; color: "#00E04B"; font.pointSize: ScreenTools.smallFontPointSize; anchors.horizontalCenter: parent.horizontalCenter }
+                }
+                Column {
+                    spacing: 1
+                    QGCLabel { text: qsTr("Avg"); color: "#777777"; font.pointSize: ScreenTools.smallFontPointSize * 0.85; anchors.horizontalCenter: parent.horizontalCenter }
+                    QGCLabel { text: isNaN(navErrorPanel.avgError) ? "---" : navErrorPanel.avgError.toFixed(2) + " m"; color: "#FFD700"; font.pointSize: ScreenTools.smallFontPointSize; anchors.horizontalCenter: parent.horizontalCenter }
+                }
+                Column {
+                    spacing: 1
+                    QGCLabel { text: qsTr("Max"); color: "#777777"; font.pointSize: ScreenTools.smallFontPointSize * 0.85; anchors.horizontalCenter: parent.horizontalCenter }
+                    QGCLabel { text: isNaN(navErrorPanel.maxError) ? "---" : navErrorPanel.maxError.toFixed(2) + " m"; color: "#FF5252"; font.pointSize: ScreenTools.smallFontPointSize; anchors.horizontalCenter: parent.horizontalCenter }
+                }
+            }
+
+            // Sample count
+            QGCLabel {
+                text:           qsTr("Samples: %1").arg(navErrorPanel.sampleCount)
+                color:          "#777777"
+                font.pointSize: ScreenTools.smallFontPointSize * 0.85
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+
+            // Sparkline
+            Canvas {
+                id:     errorSparkline
+                width:  ScreenTools.defaultFontPixelWidth * 18
+                height: ScreenTools.defaultFontPixelWidth * 5
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.reset()
+
+                    var hist = navErrorPanel.errorHistory
+                    if (!hist || hist.length < 2) {
+                        ctx.fillStyle = "#333333"
+                        ctx.fillRect(0, 0, width, height)
+                        ctx.fillStyle = "#555555"
+                        ctx.font = "10px sans-serif"
+                        ctx.textAlign = "center"
+                        ctx.fillText("waiting for data...", width / 2, height / 2 + 4)
+                        return
+                    }
+
+                    // Background
+                    ctx.fillStyle = "#1A1A1A"
+                    ctx.fillRect(0, 0, width, height)
+
+                    // Compute scale
+                    var minVal = hist[0], maxVal = hist[0]
+                    for (var i = 1; i < hist.length; i++) {
+                        if (hist[i] < minVal) minVal = hist[i]
+                        if (hist[i] > maxVal) maxVal = hist[i]
+                    }
+                    var range = maxVal - minVal
+                    if (range < 0.01) range = 0.01
+                    var pad = 3
+                    var plotH = height - pad * 2
+                    var plotW = width - pad * 2
+
+                    // Fill area under curve
+                    ctx.beginPath()
+                    ctx.moveTo(pad, pad + plotH)
+                    for (var j = 0; j < hist.length; j++) {
+                        var px = pad + (j / (hist.length - 1)) * plotW
+                        var py = pad + plotH - ((hist[j] - minVal) / range) * plotH
+                        ctx.lineTo(px, py)
+                    }
+                    ctx.lineTo(pad + plotW, pad + plotH)
+                    ctx.closePath()
+                    ctx.fillStyle = Qt.rgba(1, 0.6, 0, 0.15)
+                    ctx.fill()
+
+                    // Line
+                    ctx.beginPath()
+                    for (var k = 0; k < hist.length; k++) {
+                        var lx = pad + (k / (hist.length - 1)) * plotW
+                        var ly = pad + plotH - ((hist[k] - minVal) / range) * plotH
+                        if (k === 0) ctx.moveTo(lx, ly); else ctx.lineTo(lx, ly)
+                    }
+                    ctx.strokeStyle = "#FF9800"
+                    ctx.lineWidth = 1.5
+                    ctx.stroke()
+
+                    // Latest point dot
+                    var lastX = pad + plotW
+                    var lastY = pad + plotH - ((hist[hist.length - 1] - minVal) / range) * plotH
+                    ctx.beginPath()
+                    ctx.arc(lastX, lastY, 3, 0, 2 * Math.PI)
+                    ctx.fillStyle = "#FF9800"
+                    ctx.fill()
+
+                    // Scale labels
+                    ctx.fillStyle = "#666666"
+                    ctx.font = "9px sans-serif"
+                    ctx.textAlign = "left"
+                    ctx.fillText(maxVal.toFixed(1), pad + 1, pad + 8)
+                    ctx.fillText(minVal.toFixed(1), pad + 1, height - pad)
+                }
+            }
+
+            // Reset button
+            Rectangle {
+                width:  resetLabel.width + ScreenTools.defaultFontPixelWidth * 1.5
+                height: resetLabel.height + ScreenTools.defaultFontPixelWidth * 0.5
+                radius: ScreenTools.defaultFontPixelWidth * 0.2
+                color:  resetMouse.pressed ? "#555555" : (resetMouse.containsMouse ? "#444444" : "#333333")
+                anchors.horizontalCenter: parent.horizontalCenter
+                QGCLabel {
+                    id: resetLabel; text: qsTr("Reset Stats"); color: "#AAAAAA"
+                    font.pointSize: ScreenTools.smallFontPointSize * 0.85; anchors.centerIn: parent
+                }
+                MouseArea {
+                    id: resetMouse; anchors.fill: parent; hoverEnabled: true
+                    onClicked: navErrorPanel._resetStats()
+                }
+            }
+        }
+    }
+
     // since this file is a placeholder for the custom layer in a standard build, we will just pass through the parent insets
     QGCToolInsets {
         id:                     _toolInsets
@@ -380,7 +595,7 @@ Item {
         topEdgeLeftInset:       parentToolInsets.topEdgeLeftInset
         topEdgeCenterInset:     parentToolInsets.topEdgeCenterInset
         topEdgeRightInset:      parentToolInsets.topEdgeRightInset + (pathControlPanel.visible ? pathControlPanel.height + ScreenTools.defaultFontPixelWidth * 2 : 0) + (systemControlPanel.visible ? systemControlPanel.height + ScreenTools.defaultFontPixelWidth : 0)
-        bottomEdgeLeftInset:    parentToolInsets.bottomEdgeLeftInset
+        bottomEdgeLeftInset:    parentToolInsets.bottomEdgeLeftInset + (navErrorPanel.visible ? navErrorPanel.height + ScreenTools.defaultFontPixelWidth : 0)
         bottomEdgeCenterInset:  parentToolInsets.bottomEdgeCenterInset
         bottomEdgeRightInset:   parentToolInsets.bottomEdgeRightInset + (gpsTelemetryPanel.visible ? gpsTelemetryPanel.height + ScreenTools.defaultFontPixelWidth : 0)
     }
