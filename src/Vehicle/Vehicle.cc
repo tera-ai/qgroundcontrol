@@ -2485,6 +2485,40 @@ void Vehicle::sendCommand(int compId, int command, bool showError, double param1
                 static_cast<float>(param7));
 }
 
+void Vehicle::sendCommandToSystem(int targetSystemId, int compId, int command, double param1, double param2, double param3, double param4, double param5, double param6, double param7)
+{
+    SharedLinkInterfacePtr sharedLink = vehicleLinkManager()->primaryLink().lock();
+    if (!sharedLink) {
+        qCDebug(VehicleLog) << "sendCommandToSystem: primary link gone!";
+        return;
+    }
+
+    mavlink_command_long_t cmd;
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.target_system    = static_cast<uint8_t>(targetSystemId);
+    cmd.target_component = static_cast<uint8_t>(compId);
+    cmd.command          = static_cast<uint16_t>(command);
+    cmd.confirmation     = 0;
+    cmd.param1           = static_cast<float>(param1);
+    cmd.param2           = static_cast<float>(param2);
+    cmd.param3           = static_cast<float>(param3);
+    cmd.param4           = static_cast<float>(param4);
+    cmd.param5           = static_cast<float>(param5);
+    cmd.param6           = static_cast<float>(param6);
+    cmd.param7           = static_cast<float>(param7);
+
+    mavlink_message_t msg;
+    mavlink_msg_command_long_encode_chan(
+        MAVLinkProtocol::instance()->getSystemId(),
+        MAVLinkProtocol::getComponentId(),
+        sharedLink->mavlinkChannel(),
+        &msg,
+        &cmd);
+
+    sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
+    qCDebug(VehicleLog) << "sendCommandToSystem: sent command" << command << "to system" << targetSystemId << "comp" << compId;
+}
+
 void Vehicle::sendMavCommandWithHandler(const MavCmdAckHandlerInfo_t* ackHandlerInfo, int compId, MAV_CMD command, float param1, float param2, float param3, float param4, float param5, float param6, float param7)
 {
     _sendMavCommandWorker(false,                // commandInt

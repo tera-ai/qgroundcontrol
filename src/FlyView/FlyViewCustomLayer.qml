@@ -161,6 +161,90 @@ Item {
         }
     }
 
+    // System control buttons (restart hybrid nav, kill camera publisher)
+    Rectangle {
+        id:                     systemControlPanel
+        anchors.right:          parent.right
+        anchors.top:            pathControlPanel.bottom
+        anchors.margins:        ScreenTools.defaultFontPixelWidth
+        width:                  systemControlColumn.width + ScreenTools.defaultFontPixelWidth * 2
+        height:                 systemControlColumn.height + ScreenTools.defaultFontPixelWidth * 2
+        radius:                 ScreenTools.defaultFontPixelWidth * 0.5
+        color:                  Qt.rgba(0, 0, 0, 0.7)
+        visible:                _activeVehicle
+
+        Column {
+            id:                 systemControlColumn
+            anchors.centerIn:   parent
+            spacing:            ScreenTools.defaultFontPixelWidth * 0.5
+
+            QGCLabel {
+                text:               qsTr("System Controls")
+                color:              "white"
+                font.pointSize:     ScreenTools.smallFontPointSize
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+
+            // Restart Hybrid Navigation System (target system 77)
+            Rectangle {
+                id:             restartHybridBtn
+                width:          restartHybridLabel.width + ScreenTools.defaultFontPixelWidth * 2
+                height:         restartHybridLabel.height + ScreenTools.defaultFontPixelWidth
+                radius:         ScreenTools.defaultFontPixelWidth * 0.3
+                color:          restartHybridMouse.pressed ? "#1565C0" : (restartHybridMouse.containsMouse ? "#1E88E5" : "#1976D2")
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                QGCLabel {
+                    id:                     restartHybridLabel
+                    text:                   qsTr("Restart Hybrid Nav")
+                    color:                  "white"
+                    font.pointSize:         ScreenTools.smallFontPointSize
+                    anchors.centerIn:       parent
+                }
+
+                MouseArea {
+                    id:             restartHybridMouse
+                    anchors.fill:   parent
+                    hoverEnabled:   true
+                    onClicked: {
+                        if (_activeVehicle) {
+                            _activeVehicle.sendCommandToSystem(77, 0, 246, 1, 0, 0, 0, 0, 0, 0)
+                        }
+                    }
+                }
+            }
+
+            // Kill Camera Publisher (target system 255)
+            Rectangle {
+                id:             killCameraBtn
+                width:          killCameraLabel.width + ScreenTools.defaultFontPixelWidth * 2
+                height:         killCameraLabel.height + ScreenTools.defaultFontPixelWidth
+                radius:         ScreenTools.defaultFontPixelWidth * 0.3
+                color:          killCameraMouse.pressed ? "#C62828" : (killCameraMouse.containsMouse ? "#E53935" : "#D32F2F")
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                QGCLabel {
+                    id:                     killCameraLabel
+                    text:                   qsTr("Kill Camera Publisher")
+                    color:                  "white"
+                    font.pointSize:         ScreenTools.smallFontPointSize
+                    anchors.centerIn:       parent
+                }
+
+                MouseArea {
+                    id:             killCameraMouse
+                    anchors.fill:   parent
+                    hoverEnabled:   true
+                    onClicked: {
+                        if (_activeVehicle) {
+                            _activeVehicle.sendCommandToSystem(255, 0, 246, 3, 0, 0, 0, 0, 0, 0)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // GPS Raw telemetry box (above the existing bottom-right telemetry bar)
     Rectangle {
         id:                     gpsTelemetryPanel
@@ -295,7 +379,7 @@ Item {
         rightEdgeBottomInset:   parentToolInsets.rightEdgeBottomInset + (gpsTelemetryPanel.visible ? gpsTelemetryPanel.height + ScreenTools.defaultFontPixelWidth : 0)
         topEdgeLeftInset:       parentToolInsets.topEdgeLeftInset
         topEdgeCenterInset:     parentToolInsets.topEdgeCenterInset
-        topEdgeRightInset:      parentToolInsets.topEdgeRightInset + (pathControlPanel.visible ? pathControlPanel.height + ScreenTools.defaultFontPixelWidth * 2 : 0)
+        topEdgeRightInset:      parentToolInsets.topEdgeRightInset + (pathControlPanel.visible ? pathControlPanel.height + ScreenTools.defaultFontPixelWidth * 2 : 0) + (systemControlPanel.visible ? systemControlPanel.height + ScreenTools.defaultFontPixelWidth : 0)
         bottomEdgeLeftInset:    parentToolInsets.bottomEdgeLeftInset
         bottomEdgeCenterInset:  parentToolInsets.bottomEdgeCenterInset
         bottomEdgeRightInset:   parentToolInsets.bottomEdgeRightInset + (gpsTelemetryPanel.visible ? gpsTelemetryPanel.height + ScreenTools.defaultFontPixelWidth : 0)
