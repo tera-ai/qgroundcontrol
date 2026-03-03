@@ -381,10 +381,10 @@ Item {
         color:                  Qt.rgba(0, 0, 0, 0.75)
         visible:                _activeVehicle
 
-        property var  _odomPts:  _activeVehicle ? _activeVehicle.odometryPathPoints : null
-        property var  _gpsPts:   _activeVehicle ? _activeVehicle.gpsPathPoints : null
-        property var  _odomLast: _odomPts ? _odomPts.lastPoint : QtPositioning.coordinate()
-        property var  _gpsLast:  _gpsPts  ? _gpsPts.lastPoint  : QtPositioning.coordinate()
+        property var  odomPts:  _activeVehicle ? _activeVehicle.odometryPathPoints : null
+        property var  gpsPts:   _activeVehicle ? _activeVehicle.gpsPathPoints : null
+        property var  odomLast: odomPts ? odomPts.lastPoint : null
+        property var  gpsLast:  gpsPts  ? gpsPts.lastPoint  : null
 
         property real currentError: NaN
         property real minError:     NaN
@@ -395,12 +395,12 @@ Item {
         property var  errorHistory: []
         readonly property int maxHistory: 60
 
-        on_odomLastChanged: _recomputeError()
+        onOdomLastChanged: recomputeError()
 
-        function _recomputeError() {
-            if (!_odomLast || !_gpsLast) return
-            if (!_odomLast.isValid || !_gpsLast.isValid) return
-            var d = _gpsLast.distanceTo(_odomLast)
+        function recomputeError() {
+            if (!odomLast || !gpsLast) return
+            if (!odomLast.isValid || !gpsLast.isValid) return
+            var d = gpsLast.distanceTo(odomLast)
             if (isNaN(d) || d > 50000) return
 
             currentError = d
@@ -418,7 +418,7 @@ Item {
             errorSparkline.requestPaint()
         }
 
-        function _resetStats() {
+        function resetStats() {
             currentError = NaN; minError = NaN; maxError = NaN; avgError = NaN
             sampleCount = 0; errorSum = 0; errorHistory = []
             errorSparkline.requestPaint()
@@ -437,26 +437,24 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
             }
 
-            // Current error (large)
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
                 spacing: ScreenTools.defaultFontPixelWidth * 0.3
                 QGCLabel {
                     text:           isNaN(navErrorPanel.currentError) ? "---" : navErrorPanel.currentError.toFixed(3)
-                    color:          navErrorPanel.currentError < 1.0 ? "#00E04B" : (navErrorPanel.currentError < 5.0 ? "#FFD700" : "#FF5252")
+                    color:          isNaN(navErrorPanel.currentError) ? "#AAAAAA" : (navErrorPanel.currentError < 1.0 ? "#00E04B" : (navErrorPanel.currentError < 5.0 ? "#FFD700" : "#FF5252"))
                     font.pointSize: ScreenTools.mediumFontPointSize
                     font.bold:      true
-                    anchors.baseline: errorUnitLabel.baseline
+                    anchors.verticalCenter: parent.verticalCenter
                 }
                 QGCLabel {
-                    id: errorUnitLabel
                     text:           "m"
                     color:          "#AAAAAA"
                     font.pointSize: ScreenTools.smallFontPointSize
+                    anchors.verticalCenter: parent.verticalCenter
                 }
             }
 
-            // Min / Max / Avg row
             Row {
                 spacing: ScreenTools.defaultFontPixelWidth
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -477,7 +475,6 @@ Item {
                 }
             }
 
-            // Sample count
             QGCLabel {
                 text:           qsTr("Samples: %1").arg(navErrorPanel.sampleCount)
                 color:          "#777777"
@@ -485,7 +482,6 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
             }
 
-            // Sparkline
             Canvas {
                 id:     errorSparkline
                 width:  ScreenTools.defaultFontPixelWidth * 18
@@ -507,11 +503,9 @@ Item {
                         return
                     }
 
-                    // Background
                     ctx.fillStyle = "#1A1A1A"
                     ctx.fillRect(0, 0, width, height)
 
-                    // Compute scale
                     var minVal = hist[0], maxVal = hist[0]
                     for (var i = 1; i < hist.length; i++) {
                         if (hist[i] < minVal) minVal = hist[i]
@@ -523,7 +517,6 @@ Item {
                     var plotH = height - pad * 2
                     var plotW = width - pad * 2
 
-                    // Fill area under curve
                     ctx.beginPath()
                     ctx.moveTo(pad, pad + plotH)
                     for (var j = 0; j < hist.length; j++) {
@@ -536,7 +529,6 @@ Item {
                     ctx.fillStyle = Qt.rgba(1, 0.6, 0, 0.15)
                     ctx.fill()
 
-                    // Line
                     ctx.beginPath()
                     for (var k = 0; k < hist.length; k++) {
                         var lx = pad + (k / (hist.length - 1)) * plotW
@@ -547,7 +539,6 @@ Item {
                     ctx.lineWidth = 1.5
                     ctx.stroke()
 
-                    // Latest point dot
                     var lastX = pad + plotW
                     var lastY = pad + plotH - ((hist[hist.length - 1] - minVal) / range) * plotH
                     ctx.beginPath()
@@ -555,7 +546,6 @@ Item {
                     ctx.fillStyle = "#FF9800"
                     ctx.fill()
 
-                    // Scale labels
                     ctx.fillStyle = "#666666"
                     ctx.font = "9px sans-serif"
                     ctx.textAlign = "left"
@@ -564,7 +554,6 @@ Item {
                 }
             }
 
-            // Reset button
             Rectangle {
                 width:  resetLabel.width + ScreenTools.defaultFontPixelWidth * 1.5
                 height: resetLabel.height + ScreenTools.defaultFontPixelWidth * 0.5
@@ -577,7 +566,7 @@ Item {
                 }
                 MouseArea {
                     id: resetMouse; anchors.fill: parent; hoverEnabled: true
-                    onClicked: navErrorPanel._resetStats()
+                    onClicked: navErrorPanel.resetStats()
                 }
             }
         }
