@@ -23,6 +23,7 @@ Item {
     property var mapControl
 
     property var _activeVehicle:    QGroundControl.multiVehicleManager.activeVehicle
+    property bool _showNavError:    QGroundControl.settingsManager.flyViewSettings.showNavErrorPanel.rawValue
 
     // Path overlay toggle controls
     Rectangle {
@@ -379,7 +380,7 @@ Item {
         height:                 navErrorColumn.height + ScreenTools.defaultFontPixelWidth * 1.5
         radius:                 ScreenTools.defaultFontPixelWidth * 0.5
         color:                  Qt.rgba(0, 0, 0, 0.75)
-        visible:                _activeVehicle
+        visible:                _activeVehicle && _showNavError
 
         property var  odomPts:  _activeVehicle ? _activeVehicle.odometryPathPoints : null
         property var  gpsPts:   _activeVehicle ? _activeVehicle.gpsPathPoints : null

@@ -108,6 +108,12 @@
     "shortDesc":    "Enable automatic mission start/resume popups",
     "type":         "bool",
     "default":      true
+},
+{
+    "name":         "showNavErrorPanel",
+    "shortDesc":    "Show GPS vs Odometry navigation error panel on fly view",
+    "type":         "bool",
+    "default":      true
 }
 ]
 }

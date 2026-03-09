@@ -221,6 +221,14 @@ SettingsPage {
             visible:            _lockNoseUpCompass.visible
             fact:               _lockNoseUpCompass
         }
+
+        FactCheckBoxSlider {
+            Layout.fillWidth:   true
+            text:               qsTr("Show Nav Error Panel")
+            fact:               _showNavErrorPanel
+            visible:            _showNavErrorPanel.visible
+            property Fact _showNavErrorPanel: _flyViewSettings.showNavErrorPanel
+        }
     }
 
     SettingsGroupLayout {
