@@ -39,6 +39,13 @@ FlightMap {
     property bool   _keepVehicleCentered:       pipMode ? true : false
     property bool   _saveZoomLevelSetting:      true
 
+    // Toggleable map overlays controlled from FlyViewCustomLayer.qml
+    property bool   velocityArrowEnabled:       false
+
+    // Per-estimator-type cap for the odometry estimator-dots overlay (separate
+    // from the C++-side per-type cap so we can keep dot rendering performant).
+    readonly property int _odomDotsMaxPerType:  1500
+
     function _adjustMapZoomForPipMode() {
         _saveZoomLevelSetting = false
         if (pipMode) {
@@ -299,36 +306,69 @@ FlightMap {
         z:          QGroundControl.zOrderTrajectoryLines
         visible:    !pipMode && _activeVehicle && _activeVehicle.odometryPathPoints.enabled
 
+        // Rebuild polyline + dots model from the OdometryPathPoints C++-side
+        // entries, applying the current plotPropagation filter.
+        function rebuildFromSource() {
+            odomEstimatorDotsModel.clear()
+            odomDotsTypeCounts.mapping = 0
+            odomDotsTypeCounts.tracking = 0
+            odomDotsTypeCounts.propagation = 0
+
+            if (!_activeVehicle || !_activeVehicle.odometryPathPoints.enabled) {
+                odometryPathPolyline.path = []
+                return
+            }
+
+            var entries = _activeVehicle.odometryPathPoints.pointsWithType()
+            var plotProp = _activeVehicle.odometryPathPoints.plotPropagation
+            var path = []
+            for (var i = 0; i < entries.length; ++i) {
+                var t = entries[i].type
+                if (t === 2 && !plotProp) {
+                    continue
+                }
+                var c = entries[i].coord
+                path.push(c)
+                odomEstimatorDotsModel.append({ "lat": c.latitude, "lon": c.longitude, "estType": t })
+                _bumpDotsTypeCount(t)
+                _evictOldestDotForType(t)
+            }
+            odometryPathPolyline.path = path
+        }
+
         Connections {
             target:                 QGroundControl.multiVehicleManager
             function onActiveVehicleChanged(activeVehicle) {
-                odometryPathPolyline.path = _activeVehicle && _activeVehicle.odometryPathPoints.enabled ? _activeVehicle.odometryPathPoints.list() : []
-                odomEstimatorDotsModel.clear()
+                odometryPathPolyline.rebuildFromSource()
             }
         }
 
         Connections {
             target:                             _activeVehicle ? _activeVehicle.odometryPathPoints : null
             function onPointAdded(coordinate, estimatorType) {
+                var plotProp = _activeVehicle.odometryPathPoints.plotPropagation
+                if (estimatorType === 2 && !plotProp) {
+                    return
+                }
                 if (odometryPathPolyline.visible) {
                     odometryPathPolyline.addCoordinate(coordinate)
                 }
                 odomEstimatorDotsModel.append({ "lat": coordinate.latitude, "lon": coordinate.longitude, "estType": estimatorType })
-                if (odomEstimatorDotsModel.count > 600) {
-                    odomEstimatorDotsModel.remove(0)
-                }
+                _bumpDotsTypeCount(estimatorType)
+                _evictOldestDotForType(estimatorType)
             }
             function onPointsCleared() {
                 odometryPathPolyline.path = []
                 odomEstimatorDotsModel.clear()
+                odomDotsTypeCounts.mapping = 0
+                odomDotsTypeCounts.tracking = 0
+                odomDotsTypeCounts.propagation = 0
             }
             function onEnabledChanged() {
-                if (_activeVehicle && _activeVehicle.odometryPathPoints.enabled) {
-                    odometryPathPolyline.path = _activeVehicle.odometryPathPoints.list()
-                } else {
-                    odometryPathPolyline.path = []
-                    odomEstimatorDotsModel.clear()
-                }
+                odometryPathPolyline.rebuildFromSource()
+            }
+            function onPlotPropagationChanged() {
+                odometryPathPolyline.rebuildFromSource()
             }
         }
     }
@@ -336,6 +376,40 @@ FlightMap {
     // Model for estimator type dots along the odometry path
     ListModel {
         id: odomEstimatorDotsModel
+    }
+
+    // Per-estimator-type counters for the dots model so a high-rate stream
+    // (e.g. propagation) can never push mapping/tracking dots out.
+    QtObject {
+        id: odomDotsTypeCounts
+        property int mapping:     0
+        property int tracking:    0
+        property int propagation: 0
+    }
+
+    function _bumpDotsTypeCount(estType) {
+        if (estType === 0)      odomDotsTypeCounts.mapping++
+        else if (estType === 1) odomDotsTypeCounts.tracking++
+        else if (estType === 2) odomDotsTypeCounts.propagation++
+    }
+
+    function _evictOldestDotForType(estType) {
+        var cap = _odomDotsMaxPerType
+        var count = (estType === 0) ? odomDotsTypeCounts.mapping :
+                    (estType === 1) ? odomDotsTypeCounts.tracking :
+                    (estType === 2) ? odomDotsTypeCounts.propagation : 0
+        if (count <= cap) {
+            return
+        }
+        for (var i = 0; i < odomEstimatorDotsModel.count; ++i) {
+            if (odomEstimatorDotsModel.get(i).estType === estType) {
+                odomEstimatorDotsModel.remove(i)
+                if (estType === 0)      odomDotsTypeCounts.mapping--
+                else if (estType === 1) odomDotsTypeCounts.tracking--
+                else if (estType === 2) odomDotsTypeCounts.propagation--
+                break
+            }
+        }
     }
 
     // Colored dots on the odometry path showing estimator type history
@@ -435,6 +509,99 @@ FlightMap {
 
                 ctx.fill()
                 ctx.stroke()
+            }
+        }
+    }
+
+    // Velocity arrow (LOCAL_POSITION_NED vx/vy) drawn from the vehicle icon.
+    // Length is time-projected (where the vehicle would be in LOOKAHEAD_SECONDS),
+    // so direction comes from atan2(vy, vx) and magnitude scales the arrow length.
+    QtObject {
+        id: velocityArrowState
+
+        readonly property real lookaheadSeconds: 1.0
+        readonly property real minSpeed:         0.2 // m/s, below this we hide the arrow
+
+        property var  _vx:        _activeVehicle && _activeVehicle.localPosition ? _activeVehicle.localPosition.vx : null
+        property var  _vy:        _activeVehicle && _activeVehicle.localPosition ? _activeVehicle.localPosition.vy : null
+        property real vxValue:    _vx ? _vx.rawValue : NaN
+        property real vyValue:    _vy ? _vy.rawValue : NaN
+
+        property real speed:      (isNaN(vxValue) || isNaN(vyValue)) ? 0 : Math.sqrt(vxValue * vxValue + vyValue * vyValue)
+        // Azimuth measured clockwise from North, in degrees, in [0, 360).
+        property real azimuthDeg: (isNaN(vxValue) || isNaN(vyValue)) ? 0
+                                  : ((Math.atan2(vyValue, vxValue) * 180.0 / Math.PI) + 360.0) % 360.0
+
+        property var  startCoord: _activeVehicle ? _activeVehicle.coordinate : QtPositioning.coordinate()
+        property var  endCoord:   (startCoord && startCoord.isValid && speed >= minSpeed)
+                                  ? startCoord.atDistanceAndAzimuth(speed * lookaheadSeconds, azimuthDeg)
+                                  : QtPositioning.coordinate()
+
+        property bool active:     !pipMode && velocityArrowEnabled && _activeVehicle
+                                  && startCoord && startCoord.isValid && speed >= minSpeed
+                                  && endCoord && endCoord.isValid
+    }
+
+    MapPolyline {
+        id:         velocityArrowLine
+        line.width: 3
+        line.color: "#FF8A00" // Orange: contrasts with red vehicle icon and other paths
+        z:          QGroundControl.zOrderTrajectoryLines + 1
+        visible:    velocityArrowState.active
+        path:       velocityArrowState.active ? [velocityArrowState.startCoord, velocityArrowState.endCoord] : []
+    }
+
+    MapQuickItem {
+        id:             velocityArrowHead
+        z:              QGroundControl.zOrderTrajectoryLines + 1.5
+        visible:        velocityArrowState.active
+        coordinate:     velocityArrowState.endCoord
+        anchorPoint.x:  velocityArrowHeadShape.width / 2
+        anchorPoint.y:  velocityArrowHeadShape.height / 2
+
+        sourceItem: Item {
+            id:                 velocityArrowHeadShape
+            width:              16
+            height:             16
+            transformOrigin:    Item.Center
+            // Arrow points "up" (toward 0/north) by default; rotate to azimuth.
+            rotation:           velocityArrowState.azimuthDeg
+
+            Canvas {
+                id:           velocityArrowCanvas
+                anchors.fill: parent
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.reset()
+                    var w = width, h = height
+                    ctx.fillStyle = "#FF8A00"
+                    ctx.strokeStyle = "#5A2E00"
+                    ctx.lineWidth = 1.0
+                    ctx.beginPath()
+                    ctx.moveTo(w / 2, 0)              // Tip (pointing up = north before rotation)
+                    ctx.lineTo(w, h)                  // Bottom-right
+                    ctx.lineTo(w / 2, h * 0.7)        // Notch
+                    ctx.lineTo(0, h)                  // Bottom-left
+                    ctx.closePath()
+                    ctx.fill()
+                    ctx.stroke()
+                }
+            }
+
+            // Speed label next to the arrowhead
+            Text {
+                anchors.left:           parent.right
+                anchors.leftMargin:     4
+                anchors.verticalCenter: parent.verticalCenter
+                // Counter-rotate so the label stays upright on screen.
+                rotation:               -velocityArrowState.azimuthDeg
+                transformOrigin:        Item.Left
+                text:                   velocityArrowState.speed.toFixed(1) + " m/s"
+                color:                  "#FF8A00"
+                font.bold:              true
+                font.pointSize:         ScreenTools.smallFontPointSize
+                style:                  Text.Outline
+                styleColor:             "black"
             }
         }
     }

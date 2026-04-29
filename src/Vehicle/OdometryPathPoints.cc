@@ -21,6 +21,29 @@ OdometryPathPoints::OdometryPathPoints(Vehicle* vehicle, QObject* parent)
     qDebug() << "OdometryPathPoints created for vehicle" << vehicle->id();
 }
 
+QVariantList OdometryPathPoints::list(void) const
+{
+    QVariantList out;
+    out.reserve(_entries.size());
+    for (const Entry& e : _entries) {
+        out.append(QVariant::fromValue(e.coord));
+    }
+    return out;
+}
+
+QVariantList OdometryPathPoints::pointsWithType(void) const
+{
+    QVariantList out;
+    out.reserve(_entries.size());
+    for (const Entry& e : _entries) {
+        QVariantMap m;
+        m.insert(QStringLiteral("coord"), QVariant::fromValue(e.coord));
+        m.insert(QStringLiteral("type"),  e.type);
+        out.append(m);
+    }
+    return out;
+}
+
 void OdometryPathPoints::setEnabled(bool enabled)
 {
     if (_enabled != enabled) {
@@ -51,6 +74,14 @@ void OdometryPathPoints::setEnabled(bool enabled)
             qDebug() << "Odometry Path reference coordinate:" << _referenceCoordinate << "type:" << _referenceType;
         }
         emit enabledChanged();
+    }
+}
+
+void OdometryPathPoints::setPlotPropagation(bool plot)
+{
+    if (_plotPropagation != plot) {
+        _plotPropagation = plot;
+        emit plotPropagationChanged();
     }
 }
 
@@ -107,19 +138,35 @@ void OdometryPathPoints::addOdometryPoint(double x, double y, double z, int esti
         return;
     }
 
-    _points.append(QVariant::fromValue(coordinate));
-
-    if (_points.size() > _maxPointCount) {
-        _points.removeFirst();
+    // Per-estimator-type eviction: ensure adding this point doesn't push the
+    // count for its type above _maxPointsPerType. If it would, find and remove
+    // the oldest entry of THIS type only, leaving other types untouched.
+    const bool typeIsKnown = (estimatorType >= 0 && estimatorType <= 2);
+    if (typeIsKnown && _typeCounts[estimatorType] >= _maxPointsPerType) {
+        for (int i = 0; i < _entries.size(); ++i) {
+            if (_entries[i].type == estimatorType) {
+                _entries.removeAt(i);
+                _typeCounts[estimatorType]--;
+                break;
+            }
+        }
     }
 
-    qDebug() << "Odometry Path point added:" << coordinate << "from NED:" << x << y << z << "estimator:" << estimatorType << "Total:" << _points.size();
+    _entries.append({coordinate, estimatorType});
+    if (typeIsKnown) {
+        _typeCounts[estimatorType]++;
+    }
+
+    qDebug() << "Odometry Path point added:" << coordinate << "from NED:" << x << y << z << "estimator:" << estimatorType << "Total:" << _entries.size();
     emit pointAdded(coordinate, estimatorType);
 }
 
 void OdometryPathPoints::clear(void)
 {
-    _points.clear();
+    _entries.clear();
+    for (int i = 0; i < 3; ++i) {
+        _typeCounts[i] = 0;
+    }
     _lastPoint = QGeoCoordinate();
     _referenceCoordinate = QGeoCoordinate();
     emit pointsCleared();

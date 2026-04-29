@@ -81,6 +81,21 @@ Item {
                 }
             }
 
+            QGCCheckBox {
+                text:               qsTr("Velocity Arrow")
+                checked:            mapControl ? mapControl.velocityArrowEnabled : false
+                onClicked:          if (mapControl) mapControl.velocityArrowEnabled = checked
+
+                Rectangle {
+                    width:          ScreenTools.defaultFontPixelWidth * 1.5
+                    height:         ScreenTools.defaultFontPixelWidth * 0.5
+                    color:          "#FF8A00"
+                    anchors.left:   parent.right
+                    anchors.leftMargin: ScreenTools.defaultFontPixelWidth * 0.5
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+
             // Estimator type legend (visible when odometry path is enabled)
             Column {
                 visible:    _activeVehicle ? _activeVehicle.odometryPathPoints.enabled : false
@@ -91,6 +106,12 @@ Item {
                     text:           qsTr("Estimator Type:")
                     color:          "white"
                     font.pointSize: ScreenTools.smallFontPointSize
+                }
+
+                QGCCheckBox {
+                    text:           qsTr("Plot Propagation")
+                    checked:        _activeVehicle ? _activeVehicle.odometryPathPoints.plotPropagation : true
+                    onClicked:      if (_activeVehicle) _activeVehicle.odometryPathPoints.plotPropagation = checked
                 }
 
                 Row {
