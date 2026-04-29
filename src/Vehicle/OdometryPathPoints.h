@@ -16,6 +16,8 @@
 #include <QtPositioning/QGeoCoordinate>
 #include <QtQmlIntegration/QtQmlIntegration>
 
+#include <limits>
+
 class Vehicle;
 
 class OdometryPathPoints : public QObject
@@ -34,7 +36,27 @@ class OdometryPathPoints : public QObject
     Q_PROPERTY(int estimatorMapping READ estimatorMapping CONSTANT)
     Q_PROPERTY(int estimatorTracking READ estimatorTracking CONSTANT)
     Q_PROPERTY(int estimatorPropagation READ estimatorPropagation CONSTANT)
-    
+
+    // Latest odom message timing (any estimator type)
+    Q_PROPERTY(quint64 lastDroneUsec   READ lastDroneUsec   NOTIFY timingChanged)
+    Q_PROPERTY(qint64  lastArrivalMs   READ lastArrivalMs   NOTIFY timingChanged)
+
+    // Per-estimator-type timestamps. droneUsec is whatever the message carried
+    // in odom.time_usec; arrivalMs is the GCS wall clock (ms since epoch) at the
+    // moment the message was processed.
+    Q_PROPERTY(quint64 mappingDroneUsec     READ mappingDroneUsec     NOTIFY timingChanged)
+    Q_PROPERTY(qint64  mappingArrivalMs     READ mappingArrivalMs     NOTIFY timingChanged)
+    Q_PROPERTY(quint64 trackingDroneUsec    READ trackingDroneUsec    NOTIFY timingChanged)
+    Q_PROPERTY(qint64  trackingArrivalMs    READ trackingArrivalMs    NOTIFY timingChanged)
+    Q_PROPERTY(quint64 propagationDroneUsec READ propagationDroneUsec NOTIFY timingChanged)
+    Q_PROPERTY(qint64  propagationArrivalMs READ propagationArrivalMs NOTIFY timingChanged)
+
+    // Latest odom-derived attitude (Tait-Bryan, ZYX intrinsic), in degrees.
+    // NaN until the first valid quaternion has been ingested.
+    Q_PROPERTY(double odomRollDeg  READ odomRollDeg  NOTIFY odomAttitudeChanged)
+    Q_PROPERTY(double odomPitchDeg READ odomPitchDeg NOTIFY odomAttitudeChanged)
+    Q_PROPERTY(double odomYawDeg   READ odomYawDeg   NOTIFY odomAttitudeChanged)
+
 public:
     OdometryPathPoints(Vehicle* vehicle, QObject* parent = nullptr);
 
@@ -50,6 +72,15 @@ public:
     // preserving original insertion order across all estimator types.
     Q_INVOKABLE QVariantList pointsWithType(void) const;
 
+    // Returns the estimated current drone-side time_boot_ms based on the last
+    // captured baseline (e.g. ATTITUDE.time_boot_ms) plus elapsed wall time
+    // since that baseline was captured. Returns 0 if no baseline has been seen.
+    Q_INVOKABLE qint64 droneNowMs(void) const;
+
+    // Called by Vehicle when a high-rate timestamped MAVLink message arrives,
+    // so we can estimate current drone-side time even between odom messages.
+    void updateDroneClockBaseline(quint64 droneTimeBootMs);
+
     bool enabled(void) const { return _enabled; }
     bool plotPropagation(void) const { return _plotPropagation; }
     QGeoCoordinate lastPoint(void) const { return _lastPoint; }
@@ -63,6 +94,19 @@ public:
     int estimatorTracking(void) const { return Tracking; }
     int estimatorPropagation(void) const { return Propagation; }
 
+    quint64 lastDroneUsec(void) const           { return _lastAnyDroneUsec; }
+    qint64  lastArrivalMs(void) const           { return _lastAnyArrivalMs; }
+    quint64 mappingDroneUsec(void) const        { return _lastDroneUsec[Mapping]; }
+    qint64  mappingArrivalMs(void) const        { return _lastArrivalMs[Mapping]; }
+    quint64 trackingDroneUsec(void) const       { return _lastDroneUsec[Tracking]; }
+    qint64  trackingArrivalMs(void) const       { return _lastArrivalMs[Tracking]; }
+    quint64 propagationDroneUsec(void) const    { return _lastDroneUsec[Propagation]; }
+    qint64  propagationArrivalMs(void) const    { return _lastArrivalMs[Propagation]; }
+
+    double odomRollDeg(void) const  { return _odomRollDeg; }
+    double odomPitchDeg(void) const { return _odomPitchDeg; }
+    double odomYawDeg(void) const   { return _odomYawDeg; }
+
 signals:
     void pointAdded(QGeoCoordinate coordinate, int estimatorType);
     void lastPointChanged();
@@ -72,13 +116,19 @@ signals:
     void plotPropagationChanged();
     void usingFallbackChanged();
     void referenceTypeChanged();
+    void timingChanged();
+    void odomAttitudeChanged();
 
 public slots:
     void clear(void);
-    void addOdometryPoint(double x, double y, double z, int estimatorType);
+    // Receives odom.time_usec, the attitude quaternion (w,x,y,z) and position
+    // in NED. Pass nullptr for q if the message had no valid attitude.
+    void addOdometryPoint(quint64 timeUsec, const float q[4],
+                          double x, double y, double z, int estimatorType);
 
 private:
     void _setReferenceInfo(bool usingFallback, const QString& referenceType);
+    void _updateOdomAttitude(const float q[4]);
 
     struct Entry {
         QGeoCoordinate coord;
@@ -99,5 +149,22 @@ private:
     // Per-estimator-type cap so a high-rate stream (e.g. propagation) can never
     // evict mapping/tracking history during long flights.
     static constexpr int _maxPointsPerType = 3000;
+
+    // Timing
+    quint64 _lastDroneUsec[3]     = {0, 0, 0};
+    qint64  _lastArrivalMs[3]     = {0, 0, 0};
+    quint64 _lastAnyDroneUsec     = 0;
+    qint64  _lastAnyArrivalMs     = 0;
+
+    // Drone clock baseline (captured from another timestamped MAVLink message
+    // such as ATTITUDE) so we can estimate current drone-side time between
+    // odom messages.
+    qint64  _droneBootBaselineGcsMs = 0;
+    quint64 _droneBootBaselineMs    = 0;
+
+    // Latest odom-derived attitude in degrees (NaN until first valid quaternion).
+    double  _odomRollDeg  = std::numeric_limits<double>::quiet_NaN();
+    double  _odomPitchDeg = std::numeric_limits<double>::quiet_NaN();
+    double  _odomYawDeg   = std::numeric_limits<double>::quiet_NaN();
 };
 

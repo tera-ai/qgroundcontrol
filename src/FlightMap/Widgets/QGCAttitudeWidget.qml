@@ -12,8 +12,20 @@ Item {
     property real size
     property bool showHeading:  false
 
-    property real _rollAngle:   vehicle ? vehicle.roll.rawValue  : 0
-    property real _pitchAngle:  vehicle ? vehicle.pitch.rawValue : 0
+    // Optional explicit attitude override. When true, the widget reads the
+    // override* properties below instead of vehicle.roll/pitch/heading. Useful
+    // for driving the AH from a non-FCU source (e.g. odometry quaternion).
+    property bool overrideEnabled:      false
+    property real overrideRollDeg:      0
+    property real overridePitchDeg:     0
+    property real overrideHeadingDeg:   0
+
+    property real _rollAngle:   overrideEnabled ? overrideRollDeg
+                                : (vehicle ? vehicle.roll.rawValue  : 0)
+    property real _pitchAngle:  overrideEnabled ? overridePitchDeg
+                                : (vehicle ? vehicle.pitch.rawValue : 0)
+    property real _headingAngle: overrideEnabled ? overrideHeadingDeg
+                                : (vehicle ? vehicle.heading.rawValue : 0)
 
     width:  size
     height: size
@@ -120,7 +132,7 @@ Item {
         color:                      "white"
         visible:                    showHeading
 
-        property string _headingString: vehicle ? vehicle.heading.rawValue.toFixed(0) : "OFF"
+        property string _headingString:  (overrideEnabled || vehicle) ? _headingAngle.toFixed(0) : "OFF"
         property string _headingString2: _headingString.length === 1 ? "0" + _headingString : _headingString
         property string _headingString3: _headingString2.length === 2 ? "0" + _headingString2 : _headingString2
     }

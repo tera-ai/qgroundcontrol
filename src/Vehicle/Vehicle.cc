@@ -583,6 +583,26 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
     case MAVLINK_MSG_ID_ODOMETRY:
         _handleOdometry(message);
         break;
+    case MAVLINK_MSG_ID_ATTITUDE: {
+        // Feed the autopilot's time_boot_ms into the odometry component so it
+        // can estimate "drone-side now" between odom messages. Cheap decode of
+        // just the timestamp; VehicleFactGroup still gets the full message via
+        // the factGroup loop above.
+        mavlink_attitude_t att;
+        mavlink_msg_attitude_decode(&message, &att);
+        if (_odometryPathPoints) {
+            _odometryPathPoints->updateDroneClockBaseline(att.time_boot_ms);
+        }
+        break;
+    }
+    case MAVLINK_MSG_ID_SYSTEM_TIME: {
+        mavlink_system_time_t st;
+        mavlink_msg_system_time_decode(&message, &st);
+        if (_odometryPathPoints && st.time_boot_ms != 0) {
+            _odometryPathPoints->updateDroneClockBaseline(st.time_boot_ms);
+        }
+        break;
+    }
     case MAVLINK_MSG_ID_CAMERA_IMAGE_CAPTURED:
         _handleCameraImageCaptured(message);
         break;
@@ -846,7 +866,8 @@ void Vehicle::_handleOdometry(mavlink_message_t& message)
     // Add odometry point to path tracking (x=north, y=east, z=down in NED frame)
     // frame_id should be MAV_FRAME_LOCAL_NED (1) or MAV_FRAME_BODY_NED (8)
     // estimator_type: 0=Mapping, 1=Tracking, 2=Propagation
-    _odometryPathPoints->addOdometryPoint(odom.x, odom.y, odom.z, odom.estimator_type);
+    _odometryPathPoints->addOdometryPoint(odom.time_usec, odom.q,
+                                          odom.x, odom.y, odom.z, odom.estimator_type);
 }
 
 // TODO: VehicleFactGroup

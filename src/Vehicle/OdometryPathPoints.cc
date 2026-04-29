@@ -11,7 +11,9 @@
 #include "Vehicle.h"
 #include "QGCGeo.h"
 
+#include <QtCore/QDateTime>
 #include <QtCore/QDebug>
+#include <QtCore/qmath.h>
 #include <cmath>
 
 OdometryPathPoints::OdometryPathPoints(Vehicle* vehicle, QObject* parent)
@@ -42,6 +44,21 @@ QVariantList OdometryPathPoints::pointsWithType(void) const
         out.append(m);
     }
     return out;
+}
+
+qint64 OdometryPathPoints::droneNowMs(void) const
+{
+    if (_droneBootBaselineGcsMs == 0) {
+        return 0;
+    }
+    const qint64 elapsed = QDateTime::currentMSecsSinceEpoch() - _droneBootBaselineGcsMs;
+    return static_cast<qint64>(_droneBootBaselineMs) + elapsed;
+}
+
+void OdometryPathPoints::updateDroneClockBaseline(quint64 droneTimeBootMs)
+{
+    _droneBootBaselineMs    = droneTimeBootMs;
+    _droneBootBaselineGcsMs = QDateTime::currentMSecsSinceEpoch();
 }
 
 void OdometryPathPoints::setEnabled(bool enabled)
@@ -85,8 +102,47 @@ void OdometryPathPoints::setPlotPropagation(bool plot)
     }
 }
 
-void OdometryPathPoints::addOdometryPoint(double x, double y, double z, int estimatorType)
+void OdometryPathPoints::_updateOdomAttitude(const float q[4])
 {
+    if (!q) {
+        return;
+    }
+    // ODOMETRY message uses q = [w, x, y, z]; reject NaN.
+    if (std::isnan(q[0]) || std::isnan(q[1]) || std::isnan(q[2]) || std::isnan(q[3])) {
+        return;
+    }
+    const double w = q[0], x = q[1], y = q[2], z = q[3];
+
+    const double roll  = std::atan2(2.0 * (w * x + y * z), 1.0 - 2.0 * (x * x + y * y));
+    double sinp        = 2.0 * (w * y - z * x);
+    if (sinp >  1.0) sinp =  1.0;
+    if (sinp < -1.0) sinp = -1.0;
+    const double pitch = std::asin(sinp);
+    const double yaw   = std::atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
+
+    _odomRollDeg  = qRadiansToDegrees(roll);
+    _odomPitchDeg = qRadiansToDegrees(pitch);
+    _odomYawDeg   = qRadiansToDegrees(yaw);
+    emit odomAttitudeChanged();
+}
+
+void OdometryPathPoints::addOdometryPoint(quint64 timeUsec, const float q[4],
+                                          double x, double y, double z, int estimatorType)
+{
+    // Always update timing + attitude even if we end up dropping the point
+    // for buffer reasons; the timing/attitude reflect the latest message we
+    // saw, regardless of whether it was added to the path.
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+    _lastAnyDroneUsec  = timeUsec;
+    _lastAnyArrivalMs  = nowMs;
+    if (estimatorType >= 0 && estimatorType <= 2) {
+        _lastDroneUsec[estimatorType] = timeUsec;
+        _lastArrivalMs[estimatorType] = nowMs;
+    }
+    emit timingChanged();
+
+    _updateOdomAttitude(q);
+
     // Update reference if we don't have one yet
     if (!_referenceCoordinate.isValid()) {
         _referenceCoordinate = _vehicle->ekfOrigin();

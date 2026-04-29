@@ -633,4 +633,47 @@ ApplicationWindow {
             }
         }
     }
+
+    // Generic QML page pop-out for FlyView panels (e.g. EkfCtrlStatusPanel).
+    // Mirrors the Analyze pop-out pattern: rooted at mainWindow so the loaded
+    // QML survives when the original panel is hidden / Fly view is switched.
+    // The loaded item should expose a writable `popped` bool to suppress its
+    // own pop-out button; if it doesn't, the assignment is harmless.
+    function createWindowedQmlPage(title, source) {
+        var win = windowedQmlPage.createObject(mainWindow)
+        win.title  = title
+        win.source = source
+    }
+
+    Component {
+        id: windowedQmlPage
+
+        Window {
+            width:   ScreenTools.defaultFontPixelWidth  * 60
+            height:  ScreenTools.defaultFontPixelHeight * 30
+            visible: true
+
+            property alias source: loader.source
+
+            Rectangle {
+                color:          QGroundControl.globalPalette.window
+                anchors.fill:   parent
+
+                Loader {
+                    id:             loader
+                    anchors.fill:   parent
+                    onLoaded: {
+                        if (item && item.hasOwnProperty("popped")) {
+                            item.popped = true
+                        }
+                    }
+                }
+            }
+
+            onClosing: {
+                visible = false
+                source  = ""
+            }
+        }
+    }
 }

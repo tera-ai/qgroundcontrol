@@ -25,6 +25,11 @@ Item {
     property var _activeVehicle:    QGroundControl.multiVehicleManager.activeVehicle
     property bool _showNavError:    QGroundControl.settingsManager.flyViewSettings.showNavErrorPanel.rawValue
 
+    // Toggleable: when true, the Odometry Telemetry panel exposes the
+    // odom-derived roll/pitch/yaw rows AND the artificial horizon overlay is
+    // driven by the odometry attitude instead of the vehicle facts.
+    property bool _showOdomAttitude: false
+
     // Path overlay toggle controls
     Rectangle {
         id:                     pathControlPanel
@@ -594,19 +599,318 @@ Item {
         }
     }
 
+    // Odometry Telemetry: timing + per-type ages + optional R/P/Y readout
+    Rectangle {
+        id:                     odomTelemetryPanel
+        anchors.left:           parent.left
+        anchors.bottom:         navErrorPanel.visible ? navErrorPanel.top : parent.bottom
+        anchors.leftMargin:     ScreenTools.defaultFontPixelWidth
+        anchors.bottomMargin:   navErrorPanel.visible
+                                    ? ScreenTools.defaultFontPixelWidth
+                                    : parentToolInsets.bottomEdgeLeftInset + ScreenTools.defaultFontPixelWidth
+        width:                  odomTelemetryColumn.width + ScreenTools.defaultFontPixelWidth * 2
+        height:                 odomTelemetryColumn.height + ScreenTools.defaultFontPixelWidth * 1.5
+        radius:                 ScreenTools.defaultFontPixelWidth * 0.5
+        color:                  Qt.rgba(0, 0, 0, 0.75)
+        visible:                _activeVehicle && _activeVehicle.odometryPathPoints
+                                && _activeVehicle.odometryPathPoints.enabled
+
+        property var  odomPts:  _activeVehicle ? _activeVehicle.odometryPathPoints : null
+        // Tick property bumped by the timer so all "ago" labels re-evaluate
+        // even when no new C++ signal fires.
+        property int  _tick:    0
+
+        Timer {
+            interval:           100
+            repeat:             true
+            running:            odomTelemetryPanel.visible
+            onTriggered:        odomTelemetryPanel._tick++
+        }
+
+        function _msAgo(arrivalMs) {
+            if (!arrivalMs || arrivalMs === 0) return -1
+            // Reference _tick so this re-evaluates each timer tick.
+            var _ = odomTelemetryPanel._tick
+            return Date.now() - arrivalMs
+        }
+
+        function _ageColor(ms) {
+            if (ms < 0)       return "#AAAAAA"
+            if (ms < 1000)    return "#00E04B"
+            if (ms < 3000)    return "#FFD700"
+            return "#FF5252"
+        }
+
+        function _formatAgo(ms) {
+            if (ms < 0)       return "---"
+            if (ms < 1000)    return ms.toFixed(0) + " ms"
+            return (ms / 1000.0).toFixed(2) + " s"
+        }
+
+        function _droneLatencyMs() {
+            var _ = odomTelemetryPanel._tick
+            if (!odomPts) return NaN
+            var lastUsec = odomPts.lastDroneUsec
+            if (!lastUsec || lastUsec === 0) return NaN
+            // Heuristic: > 1e15 us ~= year 2001 -> almost certainly a UNIX
+            // epoch microsecond timestamp; else it's time_boot_ms expressed in
+            // microseconds (i.e. autopilot uptime).
+            if (lastUsec > 1000000000000000) {
+                return (Date.now() * 1000 - lastUsec) / 1000.0
+            }
+            var droneNow = odomPts.droneNowMs()
+            if (!droneNow || droneNow === 0) return NaN
+            return droneNow - (lastUsec / 1000.0)
+        }
+
+        Column {
+            id:                 odomTelemetryColumn
+            anchors.centerIn:   parent
+            spacing:            ScreenTools.defaultFontPixelWidth * 0.25
+
+            QGCLabel {
+                text:               qsTr("Odometry Telemetry")
+                color:              "#536DFF"
+                font.pointSize:     ScreenTools.smallFontPointSize
+                font.bold:          true
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+
+            // Last odom (GCS arrival staleness)
+            Row {
+                spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                QGCLabel {
+                    text:           qsTr("Last odom:")
+                    color:          "#AAAAAA"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                    width:          ScreenTools.defaultFontPixelWidth * 9
+                }
+                QGCLabel {
+                    property real _ms: odomTelemetryPanel.odomPts
+                                       ? odomTelemetryPanel._msAgo(odomTelemetryPanel.odomPts.lastArrivalMs)
+                                       : -1
+                    text:           odomTelemetryPanel._formatAgo(_ms)
+                    color:          odomTelemetryPanel._ageColor(_ms)
+                    font.pointSize: ScreenTools.smallFontPointSize
+                }
+            }
+
+            // Drone-side latency (odom.time_usec vs estimated drone clock)
+            Row {
+                spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                QGCLabel {
+                    text:           qsTr("Drone lag:")
+                    color:          "#AAAAAA"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                    width:          ScreenTools.defaultFontPixelWidth * 9
+                }
+                QGCLabel {
+                    property real _ms: odomTelemetryPanel._droneLatencyMs()
+                    text:           isNaN(_ms) ? "---"
+                                    : (_ms < 1000 ? _ms.toFixed(0) + " ms"
+                                                  : (_ms / 1000.0).toFixed(2) + " s")
+                    color:          isNaN(_ms) ? "#AAAAAA" : "white"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                }
+            }
+
+            Rectangle { width: parent.width; height: 1; color: "#333333" }
+
+            // Per-estimator-type ages
+            Row {
+                spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                QGCLabel {
+                    text:           qsTr("Map:")
+                    color:          "#FFD700"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                    width:          ScreenTools.defaultFontPixelWidth * 9
+                }
+                QGCLabel {
+                    property real _ms: odomTelemetryPanel.odomPts
+                                       ? odomTelemetryPanel._msAgo(odomTelemetryPanel.odomPts.mappingArrivalMs)
+                                       : -1
+                    text:           odomTelemetryPanel._formatAgo(_ms)
+                    color:          odomTelemetryPanel._ageColor(_ms)
+                    font.pointSize: ScreenTools.smallFontPointSize
+                }
+            }
+
+            Row {
+                spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                QGCLabel {
+                    text:           qsTr("Track:")
+                    color:          "#B0B0B0"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                    width:          ScreenTools.defaultFontPixelWidth * 9
+                }
+                QGCLabel {
+                    property real _ms: odomTelemetryPanel.odomPts
+                                       ? odomTelemetryPanel._msAgo(odomTelemetryPanel.odomPts.trackingArrivalMs)
+                                       : -1
+                    text:           odomTelemetryPanel._formatAgo(_ms)
+                    color:          odomTelemetryPanel._ageColor(_ms)
+                    font.pointSize: ScreenTools.smallFontPointSize
+                }
+            }
+
+            Row {
+                spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                QGCLabel {
+                    text:           qsTr("Prop:")
+                    color:          "#FF5252"
+                    font.pointSize: ScreenTools.smallFontPointSize
+                    width:          ScreenTools.defaultFontPixelWidth * 9
+                }
+                QGCLabel {
+                    property real _ms: odomTelemetryPanel.odomPts
+                                       ? odomTelemetryPanel._msAgo(odomTelemetryPanel.odomPts.propagationArrivalMs)
+                                       : -1
+                    text:           odomTelemetryPanel._formatAgo(_ms)
+                    color:          odomTelemetryPanel._ageColor(_ms)
+                    font.pointSize: ScreenTools.smallFontPointSize
+                }
+            }
+
+            Rectangle { width: parent.width; height: 1; color: "#333333" }
+
+            QGCCheckBox {
+                text:               qsTr("Show Odom Attitude")
+                checked:            _showOdomAttitude
+                onClicked:          _showOdomAttitude = checked
+            }
+
+            // Roll / Pitch / Yaw from odom quaternion (only when toggled on)
+            Column {
+                visible: _showOdomAttitude
+                spacing: ScreenTools.defaultFontPixelWidth * 0.15
+
+                Row {
+                    spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                    QGCLabel {
+                        text:           qsTr("Roll:")
+                        color:          "#AAAAAA"
+                        font.pointSize: ScreenTools.smallFontPointSize
+                        width:          ScreenTools.defaultFontPixelWidth * 9
+                    }
+                    QGCLabel {
+                        property real _v: odomTelemetryPanel.odomPts ? odomTelemetryPanel.odomPts.odomRollDeg : NaN
+                        text:           isNaN(_v) ? "---" : _v.toFixed(1) + qsTr(" deg")
+                        color:          "white"
+                        font.pointSize: ScreenTools.smallFontPointSize
+                    }
+                }
+                Row {
+                    spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                    QGCLabel {
+                        text:           qsTr("Pitch:")
+                        color:          "#AAAAAA"
+                        font.pointSize: ScreenTools.smallFontPointSize
+                        width:          ScreenTools.defaultFontPixelWidth * 9
+                    }
+                    QGCLabel {
+                        property real _v: odomTelemetryPanel.odomPts ? odomTelemetryPanel.odomPts.odomPitchDeg : NaN
+                        text:           isNaN(_v) ? "---" : _v.toFixed(1) + qsTr(" deg")
+                        color:          "white"
+                        font.pointSize: ScreenTools.smallFontPointSize
+                    }
+                }
+                Row {
+                    spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                    QGCLabel {
+                        text:           qsTr("Yaw:")
+                        color:          "#AAAAAA"
+                        font.pointSize: ScreenTools.smallFontPointSize
+                        width:          ScreenTools.defaultFontPixelWidth * 9
+                    }
+                    QGCLabel {
+                        property real _v: odomTelemetryPanel.odomPts ? odomTelemetryPanel.odomPts.odomYawDeg : NaN
+                        text:           isNaN(_v) ? "---"
+                                        : (((_v % 360) + 360) % 360).toFixed(1) + qsTr(" deg")
+                        color:          "white"
+                        font.pointSize: ScreenTools.smallFontPointSize
+                    }
+                }
+            }
+        }
+    }
+
+    // Standalone artificial horizon overlay (top-left). Always visible when
+    // an active vehicle exists, mirroring the legacy QGC look. When
+    // _showOdomAttitude is on AND odom attitude is valid, drive it from
+    // odometry instead of the vehicle facts.
+    Item {
+        id:                 attitudeOverlay
+        anchors.left:       parent.left
+        anchors.top:        parent.top
+        anchors.leftMargin: ScreenTools.defaultFontPixelWidth
+        anchors.topMargin:  parentToolInsets.topEdgeLeftInset + ScreenTools.defaultFontPixelWidth
+        width:              ScreenTools.defaultFontPixelHeight * 7
+        height:             width
+        visible:            _activeVehicle
+
+        property var  _odomPts:    _activeVehicle ? _activeVehicle.odometryPathPoints : null
+        property bool _useOdomAtt: _showOdomAttitude && _odomPts
+                                   && !isNaN(_odomPts.odomRollDeg)
+                                   && !isNaN(_odomPts.odomPitchDeg)
+
+        QGCAttitudeWidget {
+            anchors.fill:           parent
+            size:                   parent.width
+            vehicle:                _activeVehicle
+            showHeading:            true
+            overrideEnabled:        attitudeOverlay._useOdomAtt
+            overrideRollDeg:        attitudeOverlay._odomPts ? attitudeOverlay._odomPts.odomRollDeg  : 0
+            overridePitchDeg:       attitudeOverlay._odomPts ? attitudeOverlay._odomPts.odomPitchDeg : 0
+            overrideHeadingDeg:     attitudeOverlay._odomPts
+                                    ? (((attitudeOverlay._odomPts.odomYawDeg % 360) + 360) % 360)
+                                    : 0
+        }
+
+        // Tiny "AHRS" / "ODOM" source tag overlaid on the bottom-left
+        QGCLabel {
+            anchors.bottom:         parent.bottom
+            anchors.left:           parent.left
+            anchors.margins:        ScreenTools.defaultFontPixelWidth * 0.5
+            text:                   attitudeOverlay._useOdomAtt ? qsTr("ODOM") : qsTr("AHRS")
+            color:                  attitudeOverlay._useOdomAtt ? "#536DFF" : "#FFD700"
+            font.bold:              true
+            font.pointSize:         ScreenTools.smallFontPointSize * 0.85
+            style:                  Text.Outline
+            styleColor:             "black"
+        }
+    }
+
+    // EKF Control parameter status panel (EK2/EK3 EV_CTRL & GPS_CTRL).
+    // Self-hides if none of the params exist on the connected autopilot.
+    EkfCtrlStatusPanel {
+        id:                     ekfCtrlPanel
+        anchors.left:           parent.left
+        anchors.top:            attitudeOverlay.visible ? attitudeOverlay.bottom : parent.top
+        anchors.leftMargin:     ScreenTools.defaultFontPixelWidth
+        anchors.topMargin:      attitudeOverlay.visible
+                                    ? ScreenTools.defaultFontPixelHeight * 1.6
+                                    : parentToolInsets.topEdgeLeftInset + ScreenTools.defaultFontPixelWidth
+    }
+
     // since this file is a placeholder for the custom layer in a standard build, we will just pass through the parent insets
     QGCToolInsets {
         id:                     _toolInsets
         leftEdgeTopInset:       parentToolInsets.leftEdgeTopInset
+                                    + (attitudeOverlay.visible ? attitudeOverlay.height + ScreenTools.defaultFontPixelHeight * 1.6 : 0)
+                                    + (ekfCtrlPanel.visible ? ekfCtrlPanel.height + ScreenTools.defaultFontPixelWidth : 0)
         leftEdgeCenterInset:    parentToolInsets.leftEdgeCenterInset
         leftEdgeBottomInset:    parentToolInsets.leftEdgeBottomInset
         rightEdgeTopInset:      parentToolInsets.rightEdgeTopInset + (pathControlPanel.visible ? pathControlPanel.width + ScreenTools.defaultFontPixelWidth * 2 : 0)
         rightEdgeCenterInset:   parentToolInsets.rightEdgeCenterInset
         rightEdgeBottomInset:   parentToolInsets.rightEdgeBottomInset + (gpsTelemetryPanel.visible ? gpsTelemetryPanel.height + ScreenTools.defaultFontPixelWidth : 0)
         topEdgeLeftInset:       parentToolInsets.topEdgeLeftInset
+                                    + (attitudeOverlay.visible ? attitudeOverlay.width + ScreenTools.defaultFontPixelWidth : 0)
+                                    + (ekfCtrlPanel.visible ? ekfCtrlPanel.width + ScreenTools.defaultFontPixelWidth : 0)
         topEdgeCenterInset:     parentToolInsets.topEdgeCenterInset
         topEdgeRightInset:      parentToolInsets.topEdgeRightInset + (pathControlPanel.visible ? pathControlPanel.height + ScreenTools.defaultFontPixelWidth * 2 : 0) + (systemControlPanel.visible ? systemControlPanel.height + ScreenTools.defaultFontPixelWidth : 0)
-        bottomEdgeLeftInset:    parentToolInsets.bottomEdgeLeftInset + (navErrorPanel.visible ? navErrorPanel.height + ScreenTools.defaultFontPixelWidth : 0)
+        bottomEdgeLeftInset:    parentToolInsets.bottomEdgeLeftInset
+                                    + (navErrorPanel.visible ? navErrorPanel.height + ScreenTools.defaultFontPixelWidth : 0)
+                                    + (odomTelemetryPanel.visible ? odomTelemetryPanel.height + ScreenTools.defaultFontPixelWidth : 0)
         bottomEdgeCenterInset:  parentToolInsets.bottomEdgeCenterInset
         bottomEdgeRightInset:   parentToolInsets.bottomEdgeRightInset + (gpsTelemetryPanel.visible ? gpsTelemetryPanel.height + ScreenTools.defaultFontPixelWidth : 0)
     }
