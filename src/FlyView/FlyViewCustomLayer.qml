@@ -89,7 +89,7 @@ Item {
                 Rectangle {
                     width:          ScreenTools.defaultFontPixelWidth * 1.5
                     height:         ScreenTools.defaultFontPixelWidth * 0.5
-                    color:          "#FF8A00"
+                    color:          "#FF00C8"
                     anchors.left:   parent.right
                     anchors.leftMargin: ScreenTools.defaultFontPixelWidth * 0.5
                     anchors.verticalCenter: parent.verticalCenter

@@ -516,11 +516,18 @@ FlightMap {
     // Velocity arrow (LOCAL_POSITION_NED vx/vy) drawn from the vehicle icon.
     // Length is time-projected (where the vehicle would be in LOOKAHEAD_SECONDS),
     // so direction comes from atan2(vy, vx) and magnitude scales the arrow length.
+    //
+    // The shaft AND the arrowhead are rendered as a single MapPolyline so they
+    // can never desync visually (separate MapItems can render in different
+    // frames, which previously caused the head to lag behind the shaft tip).
     QtObject {
         id: velocityArrowState
 
-        readonly property real lookaheadSeconds: 1.0
-        readonly property real minSpeed:         0.2 // m/s, below this we hide the arrow
+        readonly property real lookaheadSeconds:  1.0
+        readonly property real minSpeed:          0.2  // m/s, below this we hide the arrow
+        readonly property real wingHalfAngleDeg:  30   // angle of arrowhead wings from shaft
+        readonly property real wingFraction:      0.22 // wing length as fraction of shaft length
+        readonly property real wingMinMeters:     1.5  // minimum wing length so head is visible at low speed
 
         property var  _vx:        _activeVehicle && _activeVehicle.localPosition ? _activeVehicle.localPosition.vx : null
         property var  _vy:        _activeVehicle && _activeVehicle.localPosition ? _activeVehicle.localPosition.vy : null
@@ -533,9 +540,28 @@ FlightMap {
                                   : ((Math.atan2(vyValue, vxValue) * 180.0 / Math.PI) + 360.0) % 360.0
 
         property var  startCoord: _activeVehicle ? _activeVehicle.coordinate : QtPositioning.coordinate()
+        property real shaftMeters: speed * lookaheadSeconds
         property var  endCoord:   (startCoord && startCoord.isValid && speed >= minSpeed)
-                                  ? startCoord.atDistanceAndAzimuth(speed * lookaheadSeconds, azimuthDeg)
+                                  ? startCoord.atDistanceAndAzimuth(shaftMeters, azimuthDeg)
                                   : QtPositioning.coordinate()
+
+        property real wingMeters:  Math.max(shaftMeters * wingFraction, wingMinMeters)
+        // Wings point back-and-out from the tip, away from start, opening by
+        // wingHalfAngleDeg on each side of the reverse shaft direction.
+        property real wingLeftAz:  ((azimuthDeg + 180 - wingHalfAngleDeg) + 360) % 360
+        property real wingRightAz: ((azimuthDeg + 180 + wingHalfAngleDeg) + 360) % 360
+        property var  wingLeft:   (endCoord && endCoord.isValid)
+                                  ? endCoord.atDistanceAndAzimuth(wingMeters, wingLeftAz)
+                                  : QtPositioning.coordinate()
+        property var  wingRight:  (endCoord && endCoord.isValid)
+                                  ? endCoord.atDistanceAndAzimuth(wingMeters, wingRightAz)
+                                  : QtPositioning.coordinate()
+
+        // Single polyline path: shaft -> tip -> left wing -> tip -> right wing.
+        // Backtracking through the tip keeps it one connected stroke.
+        property var arrowPath: active
+                                ? [startCoord, endCoord, wingLeft, endCoord, wingRight]
+                                : []
 
         property bool active:     !pipMode && velocityArrowEnabled && _activeVehicle
                                   && startCoord && startCoord.isValid && speed >= minSpeed
@@ -545,64 +571,31 @@ FlightMap {
     MapPolyline {
         id:         velocityArrowLine
         line.width: 3
-        line.color: "#FF8A00" // Orange: contrasts with red vehicle icon and other paths
+        line.color: "#FF00C8" // Magenta: distinct from red vehicle, blue/green/red paths and any GT line
         z:          QGroundControl.zOrderTrajectoryLines + 1
         visible:    velocityArrowState.active
-        path:       velocityArrowState.active ? [velocityArrowState.startCoord, velocityArrowState.endCoord] : []
+        path:       velocityArrowState.arrowPath
     }
 
+    // Speed label anchored at the tip. Drawn as a separate MapQuickItem because
+    // text isn't part of the polyline geometry; minor sub-frame label lag is
+    // not visually misleading the way a detached arrowhead would be.
     MapQuickItem {
-        id:             velocityArrowHead
+        id:             velocityArrowLabel
         z:              QGroundControl.zOrderTrajectoryLines + 1.5
         visible:        velocityArrowState.active
         coordinate:     velocityArrowState.endCoord
-        anchorPoint.x:  velocityArrowHeadShape.width / 2
-        anchorPoint.y:  velocityArrowHeadShape.height / 2
+        anchorPoint.x:  -6 // small offset to the right of the tip
+        anchorPoint.y:  velocityArrowLabelText.height / 2
 
-        sourceItem: Item {
-            id:                 velocityArrowHeadShape
-            width:              16
-            height:             16
-            transformOrigin:    Item.Center
-            // Arrow points "up" (toward 0/north) by default; rotate to azimuth.
-            rotation:           velocityArrowState.azimuthDeg
-
-            Canvas {
-                id:           velocityArrowCanvas
-                anchors.fill: parent
-                onPaint: {
-                    var ctx = getContext("2d")
-                    ctx.reset()
-                    var w = width, h = height
-                    ctx.fillStyle = "#FF8A00"
-                    ctx.strokeStyle = "#5A2E00"
-                    ctx.lineWidth = 1.0
-                    ctx.beginPath()
-                    ctx.moveTo(w / 2, 0)              // Tip (pointing up = north before rotation)
-                    ctx.lineTo(w, h)                  // Bottom-right
-                    ctx.lineTo(w / 2, h * 0.7)        // Notch
-                    ctx.lineTo(0, h)                  // Bottom-left
-                    ctx.closePath()
-                    ctx.fill()
-                    ctx.stroke()
-                }
-            }
-
-            // Speed label next to the arrowhead
-            Text {
-                anchors.left:           parent.right
-                anchors.leftMargin:     4
-                anchors.verticalCenter: parent.verticalCenter
-                // Counter-rotate so the label stays upright on screen.
-                rotation:               -velocityArrowState.azimuthDeg
-                transformOrigin:        Item.Left
-                text:                   velocityArrowState.speed.toFixed(1) + " m/s"
-                color:                  "#FF8A00"
-                font.bold:              true
-                font.pointSize:         ScreenTools.smallFontPointSize
-                style:                  Text.Outline
-                styleColor:             "black"
-            }
+        sourceItem: Text {
+            id:             velocityArrowLabelText
+            text:           velocityArrowState.speed.toFixed(1) + " m/s"
+            color:          "#FF00C8"
+            font.bold:      true
+            font.pointSize: ScreenTools.smallFontPointSize
+            style:          Text.Outline
+            styleColor:     "black"
         }
     }
 
