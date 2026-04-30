@@ -38,8 +38,24 @@ Item {
 
     FactPanelController { id: ctrl }
 
+    // Re-evaluation tick: bumped whenever parameter availability could have
+    // changed (vehicle change, parameter load progress, or load completion).
+    // QML bindings reading _existsTick will re-run their _exists() calls.
+    property int _existsTick: 0
+
+    property var _paramMgr: ctrl.vehicle ? ctrl.vehicle.parameterManager : null
+    property bool _paramsReady: _paramMgr ? _paramMgr.parametersReady : false
+    property real _loadProgress: _paramMgr ? _paramMgr.loadProgress : 0
+
+    Connections {
+        target: root._paramMgr
+        function onParametersReadyChanged() { root._existsTick++ }
+        function onLoadProgressChanged()    { root._existsTick++ }
+    }
+
     function _exists(name) {
-        return ctrl.parameterExists(-1, name)
+        // Touch _existsTick so the binding re-runs when params (re)load.
+        return (root._existsTick >= 0) && ctrl.parameterExists(-1, name)
     }
     function _factOrNull(name) {
         return _exists(name) ? ctrl.getParameterFact(-1, name, false) : null
@@ -51,11 +67,16 @@ Item {
     }
 
     property bool ek2Available:
-        _exists("EK2_EV_CTRL") || _exists("EK2_GPS_CTRL")
+        _exists("EK2_EV_CTRL")  || _exists("EK2_GPS_CTRL")  ||
+        _exists("EKF2_EV_CTRL") || _exists("EKF2_GPS_CTRL")
     property bool ek3Available:
-        _exists("EK3_EV_CTRL") || _exists("EK3_GPS_CTRL")
+        _exists("EK3_EV_CTRL")  || _exists("EK3_GPS_CTRL")  ||
+        _exists("EKF3_EV_CTRL") || _exists("EKF3_GPS_CTRL")
     property bool anyAvailable: ek2Available || ek3Available
 
+    // Hide entirely when the connected autopilot doesn't expose any of the
+    // tracked EKF params (e.g. PX4). The reactive _existsTick above forces
+    // this binding to re-evaluate once the parameter manager finishes loading.
     visible:    anyAvailable
     width:      panelRect.width
     height:     panelRect.height
@@ -92,11 +113,19 @@ Item {
                 spacing:    ScreenTools.defaultFontPixelWidth * 0.5
 
                 Repeater {
+                    // Both ArduPilot-style ("EK2_*"/"EK3_*") and the longer
+                    // "EKF2_*"/"EKF3_*" prefixes are probed. Rows for params
+                    // that don't exist on the connected autopilot self-hide
+                    // via the per-row `visible: _fact !== null` binding.
                     model: [
-                        { name: "EK2_EV_CTRL",  bits: root._evCtrlBits  },
-                        { name: "EK2_GPS_CTRL", bits: root._gpsCtrlBits },
-                        { name: "EK3_EV_CTRL",  bits: root._evCtrlBits  },
-                        { name: "EK3_GPS_CTRL", bits: root._gpsCtrlBits }
+                        { name: "EK2_EV_CTRL",   bits: root._evCtrlBits  },
+                        { name: "EK2_GPS_CTRL",  bits: root._gpsCtrlBits },
+                        { name: "EKF2_EV_CTRL",  bits: root._evCtrlBits  },
+                        { name: "EKF2_GPS_CTRL", bits: root._gpsCtrlBits },
+                        { name: "EK3_EV_CTRL",   bits: root._evCtrlBits  },
+                        { name: "EK3_GPS_CTRL",  bits: root._gpsCtrlBits },
+                        { name: "EKF3_EV_CTRL",  bits: root._evCtrlBits  },
+                        { name: "EKF3_GPS_CTRL", bits: root._gpsCtrlBits }
                     ]
 
                     // One row per param: [ NAME : 0xVAL ] [bit0][bit1]...
