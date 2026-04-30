@@ -85,27 +85,71 @@ Item {
 
             FactPanelController { id: ctrl }
 
-            // Re-evaluation tick: bumped whenever parameter availability could
-            // have changed (load progress, load completion). QML bindings
-            // reading _existsTick will re-run their _exists() calls.
-            property int _existsTick: 0
-
             property var  _paramMgr:     ctrl.vehicle ? ctrl.vehicle.parameterManager : null
+            // _paramsReady flips false -> true exactly once when ParameterManager
+            // finishes downloading the full param list. _loadProgress changes
+            // continuously during download. The existence-check bindings below
+            // depend on BOTH of these (referenced directly so QML's binding
+            // engine tracks them as dependencies, which it cannot reliably do
+            // through a JS function call boundary), so they re-evaluate as
+            // params stream in and again when the load completes.
             property bool _paramsReady:  _paramMgr ? _paramMgr.parametersReady : false
             property real _loadProgress: _paramMgr ? _paramMgr.loadProgress : 0
 
-            Connections {
-                target: panelRoot._paramMgr
-                function onParametersReadyChanged() { panelRoot._existsTick++ }
-                function onLoadProgressChanged()    { panelRoot._existsTick++ }
+            // One direct property binding per checked param. Each reads
+            // _paramsReady and _loadProgress so QML re-runs the binding as
+            // params are received and again when the load is fully ready.
+            // Placed inside a JS-block binding (the {}) so the dependency
+            // tracker sees the property reads even though the result only
+            // depends on parameterExists().
+            property bool _ek2EvExists: {
+                var _ = panelRoot._paramsReady; var __ = panelRoot._loadProgress
+                return panelRoot._paramMgr ? ctrl.parameterExists(-1, "EK2_EV_CTRL") : false
+            }
+            property bool _ek2GpsExists: {
+                var _ = panelRoot._paramsReady; var __ = panelRoot._loadProgress
+                return panelRoot._paramMgr ? ctrl.parameterExists(-1, "EK2_GPS_CTRL") : false
+            }
+            property bool _ekf2EvExists: {
+                var _ = panelRoot._paramsReady; var __ = panelRoot._loadProgress
+                return panelRoot._paramMgr ? ctrl.parameterExists(-1, "EKF2_EV_CTRL") : false
+            }
+            property bool _ekf2GpsExists: {
+                var _ = panelRoot._paramsReady; var __ = panelRoot._loadProgress
+                return panelRoot._paramMgr ? ctrl.parameterExists(-1, "EKF2_GPS_CTRL") : false
+            }
+            property bool _ek3EvExists: {
+                var _ = panelRoot._paramsReady; var __ = panelRoot._loadProgress
+                return panelRoot._paramMgr ? ctrl.parameterExists(-1, "EK3_EV_CTRL") : false
+            }
+            property bool _ek3GpsExists: {
+                var _ = panelRoot._paramsReady; var __ = panelRoot._loadProgress
+                return panelRoot._paramMgr ? ctrl.parameterExists(-1, "EK3_GPS_CTRL") : false
+            }
+            property bool _ekf3EvExists: {
+                var _ = panelRoot._paramsReady; var __ = panelRoot._loadProgress
+                return panelRoot._paramMgr ? ctrl.parameterExists(-1, "EKF3_EV_CTRL") : false
+            }
+            property bool _ekf3GpsExists: {
+                var _ = panelRoot._paramsReady; var __ = panelRoot._loadProgress
+                return panelRoot._paramMgr ? ctrl.parameterExists(-1, "EKF3_GPS_CTRL") : false
             }
 
-            function _exists(name) {
-                // Touch _existsTick so the binding re-runs when params (re)load.
-                return (panelRoot._existsTick >= 0) && ctrl.parameterExists(-1, name)
+            function _existsByName(name) {
+                switch (name) {
+                case "EK2_EV_CTRL":   return panelRoot._ek2EvExists
+                case "EK2_GPS_CTRL":  return panelRoot._ek2GpsExists
+                case "EKF2_EV_CTRL":  return panelRoot._ekf2EvExists
+                case "EKF2_GPS_CTRL": return panelRoot._ekf2GpsExists
+                case "EK3_EV_CTRL":   return panelRoot._ek3EvExists
+                case "EK3_GPS_CTRL":  return panelRoot._ek3GpsExists
+                case "EKF3_EV_CTRL":  return panelRoot._ekf3EvExists
+                case "EKF3_GPS_CTRL": return panelRoot._ekf3GpsExists
+                }
+                return false
             }
             function _factOrNull(name) {
-                return _exists(name) ? ctrl.getParameterFact(-1, name, false) : null
+                return _existsByName(name) ? ctrl.getParameterFact(-1, name, false) : null
             }
             function _hex(value) {
                 var v = (value | 0)
@@ -114,16 +158,14 @@ Item {
             }
 
             property bool ek2Available:
-                _exists("EK2_EV_CTRL")  || _exists("EK2_GPS_CTRL")  ||
-                _exists("EKF2_EV_CTRL") || _exists("EKF2_GPS_CTRL")
+                _ek2EvExists || _ek2GpsExists || _ekf2EvExists || _ekf2GpsExists
             property bool ek3Available:
-                _exists("EK3_EV_CTRL")  || _exists("EK3_GPS_CTRL")  ||
-                _exists("EKF3_EV_CTRL") || _exists("EKF3_GPS_CTRL")
+                _ek3EvExists || _ek3GpsExists || _ekf3EvExists || _ekf3GpsExists
             property bool anyAvailable: ek2Available || ek3Available
 
             // Hide entirely when the connected autopilot doesn't expose any of
-            // the tracked EKF params (e.g. PX4). The reactive _existsTick above
-            // forces this binding to re-evaluate as parameters stream in.
+            // the tracked EKF params (e.g. PX4). The bindings above re-evaluate
+            // as parameters stream in.
             visible: anyAvailable
             width:   panelRect.width
             height:  panelRect.height
