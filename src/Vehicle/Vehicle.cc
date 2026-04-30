@@ -473,9 +473,9 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
 {
     if (message.sysid != _id && message.sysid != 0) {
         // We allow RADIO_STATUS messages which come from a link the vehicle is using to pass through and be handled
-        // We also allow ODOMETRY messages from system ID 77 (primary), 255 (fallback), or 1 (fallback) to pass through
+        // We also allow ODOMETRY messages from system ID 77 (primary) or 255 (fallback) to pass through
         if (!(message.msgid == MAVLINK_MSG_ID_RADIO_STATUS && _vehicleLinkManager->containsLink(link)) &&
-            !(message.msgid == MAVLINK_MSG_ID_ODOMETRY && (message.sysid == 77 || message.sysid == 255 || message.sysid == 1))) {
+            !(message.msgid == MAVLINK_MSG_ID_ODOMETRY && (message.sysid == 77 || message.sysid == 255))) {
             return;
         }
     }
@@ -832,10 +832,11 @@ void Vehicle::_handleOdometry(mavlink_message_t& message)
                         << "quality:" << odom.quality
                         << "x:" << odom.x << "y:" << odom.y << "z:" << odom.z;
     
-    // Filter: Process ODOMETRY from system ID 77 (primary), 255 (fallback), or 1 (fallback)
-    // Prefer system 77, fall back to system 255, then system 1
+    // Filter: Process ODOMETRY from system ID 77 (primary) or 255 (fallback).
+    // Prefer system 77; only fall back to system 255 when 77 has been silent
+    // for longer than the timeout. Anything else is ignored.
     constexpr qint64 odometryTimeoutMs = 5000; // 5 second timeout before falling back to next source
-    
+
     if (message.sysid == 77) {
         // Always accept from system 77 (primary) and reset the timer
         _lastOdometry77Time.restart();
@@ -847,19 +848,8 @@ void Vehicle::_handleOdometry(mavlink_message_t& message)
         }
         qCDebug(VehicleLog) << "ODOMETRY using fallback from system 255";
         _lastOdometry255Time.restart();
-    } else if (message.sysid == 1) {
-        // Only accept from system 1 if we haven't received from system 77 or 255 recently
-        if (_lastOdometry77Time.isValid() && _lastOdometry77Time.elapsed() < odometryTimeoutMs) {
-            qCDebug(VehicleLog) << "ODOMETRY ignored from system 1 - still receiving from system 77";
-            return;
-        }
-        if (_lastOdometry255Time.isValid() && _lastOdometry255Time.elapsed() < odometryTimeoutMs) {
-            qCDebug(VehicleLog) << "ODOMETRY ignored from system 1 - still receiving from system 255";
-            return;
-        }
-        qCDebug(VehicleLog) << "ODOMETRY using fallback from system 1";
     } else {
-        qCDebug(VehicleLog) << "ODOMETRY ignored - not from system 77, 255, or 1";
+        qCDebug(VehicleLog) << "ODOMETRY ignored - not from system 77 or 255";
         return;
     }
     

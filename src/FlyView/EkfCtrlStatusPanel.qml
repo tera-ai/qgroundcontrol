@@ -15,296 +15,240 @@ import QGroundControl
 import QGroundControl.Controls
 import QGroundControl.FactControls
 
-// Surfaces ArduPilot EKF "control" parameters (EK2/EK3/EKF2/EKF3 _EV_CTRL and
-// _GPS_CTRL) directly on the Fly view. Self-hides if none of these params
-// exist on the connected autopilot (e.g. PX4 will simply hide the panel).
+// Always-visible debug panel for ArduPilot EKF "control" parameters
+// (EK2/EK3/EKF2/EKF3 _EV_CTRL and _GPS_CTRL).
 //
-// Each row renders the bitmask as a row of clickable badges. Clicking a badge
-// toggles that bit and writes the new value back through the Fact (i.e. the
-// param gets PARAM_SET to the autopilot). The displayed value is bound to
-// fact.rawValue so it also updates automatically when the param is changed
-// elsewhere (e.g. from the standard parameter editor or a GCS command).
+// One row per known param. If a param doesn't exist on the connected
+// autopilot (e.g. PX4, or before the param list has loaded) the row
+// renders "Null/NA" in place of the value + bit badges, so the panel is
+// useful as a diagnostic even when nothing is wired up yet.
+//
+// Each row's bitmask is rendered as a row of clickable badges. Clicking a
+// badge toggles that bit and writes the new value back through the Fact
+// (i.e. PARAM_SET to the autopilot). The displayed value is bound to
+// fact.rawValue so it also updates when the param is changed elsewhere.
 //
 // Implementation note: FactPanelController exposes its `vehicle` Q_PROPERTY
-// as CONSTANT, fixed to whatever MultiVehicleManager.activeVehicle was when
-// the controller was constructed. If we just instantiated a FactPanelController
-// directly here, a panel created before any real vehicle connected would
-// permanently bind to the offline-editing vehicle (which has none of these
-// params) and never re-evaluate. To work around that we wrap the actual panel
-// in a Loader and force-reload it whenever the active vehicle changes, so a
-// fresh FactPanelController is constructed against the new vehicle.
+// as CONSTANT, fixed to whatever MultiVehicleManager.activeVehicle was at
+// construction. If we just instantiated a FactPanelController directly here
+// then on first load (before any real vehicle has connected) it'd
+// permanently bind to the offline-editing vehicle and never see real
+// params. We wrap the FactPanelController-backed content in a Loader and
+// force-reload it on every activeVehicleChanged so a fresh controller is
+// constructed against the live ParameterManager.
 Item {
     id: root
 
     property var _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
 
-    // Surface the loaded panel's intrinsic geometry + visibility so the
-    // surrounding FlyViewCustomLayer.qml can lay this out and adjust its
-    // tool insets correctly.
-    visible: contentLoader.item ? contentLoader.item.visible : false
-    width:   contentLoader.item ? contentLoader.item.width   : 0
-    height:  contentLoader.item ? contentLoader.item.height  : 0
+    visible:    true
+    width:      panelRect.width
+    height:     panelRect.height
 
-    Loader {
-        id:                 contentLoader
-        // Only build the controller-backed content once we have a real,
-        // connected vehicle. The offline-editing vehicle never holds the EKF
-        // params we care about so loading against it just wastes work.
-        active:             root._activeVehicle !== null
-                            && !root._activeVehicle.isOfflineEditingVehicle
-        sourceComponent:    ekfContent
+    Rectangle {
+        id:     panelRect
+        radius: ScreenTools.defaultFontPixelWidth * 0.5
+        color:  Qt.rgba(0, 0, 0, 0.75)
+        width:  contentColumn.width  + ScreenTools.defaultFontPixelWidth  * 2
+        height: contentColumn.height + ScreenTools.defaultFontPixelWidth * 1.5
 
-        // Rebuild on every vehicle change so the embedded FactPanelController
-        // (whose `vehicle` is CONSTANT) is reconstructed against the new
-        // vehicle's ParameterManager.
-        Connections {
-            target: QGroundControl.multiVehicleManager
-            function onActiveVehicleChanged() {
-                contentLoader.active = false
-                var v = QGroundControl.multiVehicleManager.activeVehicle
-                contentLoader.active = (v !== null) && !v.isOfflineEditingVehicle
+        Column {
+            id:                 contentColumn
+            anchors.centerIn:   parent
+            spacing:            ScreenTools.defaultFontPixelWidth * 0.4
+
+            QGCLabel {
+                text:                       qsTr("EKF Control")
+                color:                      "#80DEEA"
+                font.bold:                  true
+                font.pointSize:             ScreenTools.smallFontPointSize
+                anchors.horizontalCenter:   parent.horizontalCenter
+            }
+
+            QGCLabel {
+                text:                       qsTr("Click a badge to toggle")
+                color:                      "#666666"
+                font.pointSize:             ScreenTools.smallFontPointSize * 0.8
+                anchors.horizontalCenter:   parent.horizontalCenter
+            }
+
+            // The actual rows live inside this Loader so we can rebuild
+            // them (and the FactPanelController inside) whenever the active
+            // vehicle changes. Always active so the box renders even with
+            // no vehicle (rows just show "Null/NA").
+            Loader {
+                id:                 contentLoader
+                active:             true
+                sourceComponent:    rowsComponent
+
+                function reload() {
+                    var sc = sourceComponent
+                    sourceComponent = null
+                    sourceComponent = sc
+                }
+
+                Connections {
+                    target: QGroundControl.multiVehicleManager
+                    function onActiveVehicleChanged() { contentLoader.reload() }
+                }
             }
         }
     }
 
     Component {
-        id: ekfContent
+        id: rowsComponent
 
         Item {
-            id: panelRoot
+            id: rowsRoot
 
-            // EV_CTRL bit names. ArduPilot's bitmask: bit0 X-Y POS, bit1 Z POS,
-            // bit2 X-Y VEL, bit3 Z VEL, bit4 YAW, bit5 ERR_LARGE, bit6 ERR_SMALL.
+            // EV_CTRL bit names (ArduPilot bitmask):
+            //   bit0 X-Y POS, bit1 Z POS, bit2 X-Y VEL, bit3 Z VEL,
+            //   bit4 YAW, bit5 ERR_LARGE, bit6 ERR_SMALL.
             readonly property var _evCtrlBits:
                 ["X-Y POS","Z POS","X-Y VEL","Z VEL","YAW","ERR_LRG","ERR_SML"]
-            // GPS_CTRL bit names. Best-effort: bit0 X-Y POS, bit1 Z POS,
-            // bit2 X-Y VEL, bit3 Z VEL, bit4 YAW. Bits beyond the array length
-            // render as "bitN".
+            // GPS_CTRL bit names (best-effort): bit0 X-Y POS, bit1 Z POS,
+            // bit2 X-Y VEL, bit3 Z VEL, bit4 YAW. Bits beyond the known
+            // names render as "bitN".
             readonly property var _gpsCtrlBits:
                 ["X-Y POS","Z POS","X-Y VEL","Z VEL","YAW"]
 
             FactPanelController { id: ctrl }
 
+            // Reactive triggers so the per-row _fact lookups re-run as the
+            // parameter list loads. Both are real Q_PROPERTY-backed
+            // notifiers on ParameterManager so QML's binding tracker sees
+            // them when read directly inside a binding expression.
             property var  _paramMgr:     ctrl.vehicle ? ctrl.vehicle.parameterManager : null
-            // _paramsReady flips false -> true exactly once when ParameterManager
-            // finishes downloading the full param list. _loadProgress changes
-            // continuously during download. The existence-check bindings below
-            // depend on BOTH of these (referenced directly so QML's binding
-            // engine tracks them as dependencies, which it cannot reliably do
-            // through a JS function call boundary), so they re-evaluate as
-            // params stream in and again when the load completes.
             property bool _paramsReady:  _paramMgr ? _paramMgr.parametersReady : false
-            property real _loadProgress: _paramMgr ? _paramMgr.loadProgress : 0
+            property real _loadProgress: _paramMgr ? _paramMgr.loadProgress    : 0
 
-            // One direct property binding per checked param. Each reads
-            // _paramsReady and _loadProgress so QML re-runs the binding as
-            // params are received and again when the load is fully ready.
-            // Placed inside a JS-block binding (the {}) so the dependency
-            // tracker sees the property reads even though the result only
-            // depends on parameterExists().
-            property bool _ek2EvExists: {
-                var _ = panelRoot._paramsReady; var __ = panelRoot._loadProgress
-                return panelRoot._paramMgr ? ctrl.parameterExists(-1, "EK2_EV_CTRL") : false
-            }
-            property bool _ek2GpsExists: {
-                var _ = panelRoot._paramsReady; var __ = panelRoot._loadProgress
-                return panelRoot._paramMgr ? ctrl.parameterExists(-1, "EK2_GPS_CTRL") : false
-            }
-            property bool _ekf2EvExists: {
-                var _ = panelRoot._paramsReady; var __ = panelRoot._loadProgress
-                return panelRoot._paramMgr ? ctrl.parameterExists(-1, "EKF2_EV_CTRL") : false
-            }
-            property bool _ekf2GpsExists: {
-                var _ = panelRoot._paramsReady; var __ = panelRoot._loadProgress
-                return panelRoot._paramMgr ? ctrl.parameterExists(-1, "EKF2_GPS_CTRL") : false
-            }
-            property bool _ek3EvExists: {
-                var _ = panelRoot._paramsReady; var __ = panelRoot._loadProgress
-                return panelRoot._paramMgr ? ctrl.parameterExists(-1, "EK3_EV_CTRL") : false
-            }
-            property bool _ek3GpsExists: {
-                var _ = panelRoot._paramsReady; var __ = panelRoot._loadProgress
-                return panelRoot._paramMgr ? ctrl.parameterExists(-1, "EK3_GPS_CTRL") : false
-            }
-            property bool _ekf3EvExists: {
-                var _ = panelRoot._paramsReady; var __ = panelRoot._loadProgress
-                return panelRoot._paramMgr ? ctrl.parameterExists(-1, "EKF3_EV_CTRL") : false
-            }
-            property bool _ekf3GpsExists: {
-                var _ = panelRoot._paramsReady; var __ = panelRoot._loadProgress
-                return panelRoot._paramMgr ? ctrl.parameterExists(-1, "EKF3_GPS_CTRL") : false
-            }
-
-            function _existsByName(name) {
-                switch (name) {
-                case "EK2_EV_CTRL":   return panelRoot._ek2EvExists
-                case "EK2_GPS_CTRL":  return panelRoot._ek2GpsExists
-                case "EKF2_EV_CTRL":  return panelRoot._ekf2EvExists
-                case "EKF2_GPS_CTRL": return panelRoot._ekf2GpsExists
-                case "EK3_EV_CTRL":   return panelRoot._ek3EvExists
-                case "EK3_GPS_CTRL":  return panelRoot._ek3GpsExists
-                case "EKF3_EV_CTRL":  return panelRoot._ekf3EvExists
-                case "EKF3_GPS_CTRL": return panelRoot._ekf3GpsExists
-                }
-                return false
-            }
-            function _factOrNull(name) {
-                return _existsByName(name) ? ctrl.getParameterFact(-1, name, false) : null
-            }
             function _hex(value) {
                 var v = (value | 0)
                 if (v < 0) v = v >>> 0
                 return "0x" + v.toString(16).toUpperCase()
             }
 
-            property bool ek2Available:
-                _ek2EvExists || _ek2GpsExists || _ekf2EvExists || _ekf2GpsExists
-            property bool ek3Available:
-                _ek3EvExists || _ek3GpsExists || _ekf3EvExists || _ekf3GpsExists
-            property bool anyAvailable: ek2Available || ek3Available
+            width:  paramsColumn.width
+            height: paramsColumn.height
 
-            // Hide entirely when the connected autopilot doesn't expose any of
-            // the tracked EKF params (e.g. PX4). The bindings above re-evaluate
-            // as parameters stream in.
-            visible: anyAvailable
-            width:   panelRect.width
-            height:  panelRect.height
+            Column {
+                id:         paramsColumn
+                spacing:    ScreenTools.defaultFontPixelWidth * 0.5
 
-            Rectangle {
-                id:     panelRect
-                radius: ScreenTools.defaultFontPixelWidth * 0.5
-                color:  Qt.rgba(0, 0, 0, 0.75)
-                width:  contentColumn.width  + ScreenTools.defaultFontPixelWidth  * 2
-                height: contentColumn.height + ScreenTools.defaultFontPixelWidth * 1.5
+                Repeater {
+                    model: [
+                        { name: "EK2_EV_CTRL",   bits: rowsRoot._evCtrlBits  },
+                        { name: "EK2_GPS_CTRL",  bits: rowsRoot._gpsCtrlBits },
+                        { name: "EKF2_EV_CTRL",  bits: rowsRoot._evCtrlBits  },
+                        { name: "EKF2_GPS_CTRL", bits: rowsRoot._gpsCtrlBits },
+                        { name: "EK3_EV_CTRL",   bits: rowsRoot._evCtrlBits  },
+                        { name: "EK3_GPS_CTRL",  bits: rowsRoot._gpsCtrlBits },
+                        { name: "EKF3_EV_CTRL",  bits: rowsRoot._evCtrlBits  },
+                        { name: "EKF3_GPS_CTRL", bits: rowsRoot._gpsCtrlBits }
+                    ]
 
-                Column {
-                    id:                 contentColumn
-                    anchors.centerIn:   parent
-                    spacing:            ScreenTools.defaultFontPixelWidth * 0.4
+                    // One row per known param. If the param exists, show
+                    // hex value + clickable bit badges. If not, show
+                    // "Null/NA" in place of the value + badges.
+                    delegate: Column {
+                        id: paramRow
 
-                    QGCLabel {
-                        text:                       qsTr("EKF Control")
-                        color:                      "#80DEEA"
-                        font.bold:                  true
-                        font.pointSize:             ScreenTools.smallFontPointSize
-                        anchors.horizontalCenter:   parent.horizontalCenter
-                    }
+                        // Reading _paramsReady AND _loadProgress directly in
+                        // this binding expression makes QML re-evaluate it
+                        // whenever the parameter manager makes progress
+                        // or finishes loading. getParameterFact returns
+                        // null when the param doesn't exist (with
+                        // reportMissing=false) so this gives us a single
+                        // reactive source of truth for the row.
+                        property var _fact: {
+                            // Force QML dependency tracking on these
+                            // properties even though their values are not
+                            // used in the result.
+                            var _r = rowsRoot._paramsReady
+                            var _p = rowsRoot._loadProgress
+                            return rowsRoot._paramMgr
+                                ? ctrl.getParameterFact(-1, modelData.name, false)
+                                : null
+                        }
+                        property int _value: _fact ? (_fact.rawValue | 0) : 0
+                        spacing: ScreenTools.defaultFontPixelWidth * 0.15
 
-                    QGCLabel {
-                        text:                       qsTr("Click a badge to toggle")
-                        color:                      "#666666"
-                        font.pointSize:             ScreenTools.smallFontPointSize * 0.8
-                        anchors.horizontalCenter:   parent.horizontalCenter
-                    }
+                        Row {
+                            spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                            QGCLabel {
+                                text:           modelData.name
+                                color:          paramRow._fact ? "#AAAAAA" : "#666666"
+                                font.pointSize: ScreenTools.smallFontPointSize
+                                font.bold:      true
+                                width:          ScreenTools.defaultFontPixelWidth * 13
+                            }
+                            QGCLabel {
+                                text:           paramRow._fact
+                                                    ? rowsRoot._hex(paramRow._value)
+                                                    : qsTr("Null/NA")
+                                color:          paramRow._fact ? "white" : "#888888"
+                                font.bold:      true
+                                font.italic:    !paramRow._fact
+                                font.pointSize: ScreenTools.smallFontPointSize
+                            }
+                        }
 
-                    Column {
-                        id:         paramsColumn
-                        spacing:    ScreenTools.defaultFontPixelWidth * 0.5
+                        // Bit badges only render when the fact actually
+                        // exists. For missing params there's nothing to
+                        // toggle, so the "Null/NA" label above stands alone.
+                        Flow {
+                            visible:    paramRow._fact !== null
+                            spacing:    ScreenTools.defaultFontPixelWidth * 0.25
+                            width:      ScreenTools.defaultFontPixelWidth * 26
 
-                        Repeater {
-                            // Both ArduPilot-style ("EK2_*"/"EK3_*") and the
-                            // longer "EKF2_*"/"EKF3_*" prefixes are probed.
-                            // Rows for params that don't exist on the connected
-                            // autopilot self-hide via `visible: _fact !== null`.
-                            model: [
-                                { name: "EK2_EV_CTRL",   bits: panelRoot._evCtrlBits  },
-                                { name: "EK2_GPS_CTRL",  bits: panelRoot._gpsCtrlBits },
-                                { name: "EKF2_EV_CTRL",  bits: panelRoot._evCtrlBits  },
-                                { name: "EKF2_GPS_CTRL", bits: panelRoot._gpsCtrlBits },
-                                { name: "EK3_EV_CTRL",   bits: panelRoot._evCtrlBits  },
-                                { name: "EK3_GPS_CTRL",  bits: panelRoot._gpsCtrlBits },
-                                { name: "EKF3_EV_CTRL",  bits: panelRoot._evCtrlBits  },
-                                { name: "EKF3_GPS_CTRL", bits: panelRoot._gpsCtrlBits }
-                            ]
-
-                            // One row per param: [ NAME : 0xVAL ] [bit0][bit1]...
-                            delegate: Column {
-                                id:         paramRow
-                                property var _fact:    panelRoot._factOrNull(modelData.name)
-                                // Bound to fact.rawValue so external changes update us.
-                                property int _value:   _fact ? (_fact.rawValue | 0) : 0
-                                visible:    _fact !== null
-                                spacing:    ScreenTools.defaultFontPixelWidth * 0.15
-
-                                Row {
-                                    spacing: ScreenTools.defaultFontPixelWidth * 0.5
-                                    QGCLabel {
-                                        text:           modelData.name
-                                        color:          "#AAAAAA"
-                                        font.pointSize: ScreenTools.smallFontPointSize
-                                        font.bold:      true
-                                        width:          ScreenTools.defaultFontPixelWidth * 13
+                            Repeater {
+                                // Known-name badges + any extra "bitN"
+                                // entries for set bits beyond the named
+                                // ones, so unknown bits can still be
+                                // toggled off if needed.
+                                model: {
+                                    var names = modelData.bits.slice()
+                                    var v = paramRow._value
+                                    for (var i = names.length; i < 32; ++i) {
+                                        if (v & (1 << i)) {
+                                            names.push("bit" + i)
+                                        }
                                     }
-                                    QGCLabel {
-                                        text:           panelRoot._hex(paramRow._value)
-                                        color:          "white"
-                                        font.bold:      true
-                                        font.pointSize: ScreenTools.smallFontPointSize
-                                    }
+                                    return names
                                 }
 
-                                // Clickable bit badges. We render one badge per
-                                // known bit name (length of bits array). If the
-                                // param value has bits set beyond the known
-                                // names, append extra "bitN" badges so the user
-                                // can still toggle them off.
-                                Flow {
-                                    spacing:    ScreenTools.defaultFontPixelWidth * 0.25
-                                    width:      ScreenTools.defaultFontPixelWidth * 26
+                                delegate: Rectangle {
+                                    id:             badge
+                                    property int   _bitIndex: index
+                                    property int   _bitMask:  (1 << _bitIndex)
+                                    property bool  _on:       (paramRow._value & _bitMask) !== 0
 
-                                    Repeater {
-                                        // Show known-name badges + any extra
-                                        // set bits beyond them.
-                                        model: {
-                                            var names = modelData.bits.slice()
-                                            var v = paramRow._value
-                                            for (var i = names.length; i < 32; ++i) {
-                                                if (v & (1 << i)) {
-                                                    names.push("bit" + i)
-                                                }
-                                            }
-                                            return names
-                                        }
+                                    width:          badgeText.width  + ScreenTools.defaultFontPixelWidth
+                                    height:         badgeText.height + ScreenTools.defaultFontPixelWidth * 0.3
+                                    radius:         ScreenTools.defaultFontPixelWidth * 0.25
+                                    color:          _on ? "#1976D2" : "#222222"
+                                    border.color:   _on ? "#80DEEA"
+                                                        : (badgeMouse.containsMouse ? "#666666" : "#444444")
+                                    border.width:   1
 
-                                        delegate: Rectangle {
-                                            id:             badge
-                                            property int   _bitIndex: index
-                                            property int   _bitMask:  (1 << _bitIndex)
-                                            property bool  _on:       (paramRow._value & _bitMask) !== 0
+                                    QGCLabel {
+                                        id:                 badgeText
+                                        text:               modelData
+                                        anchors.centerIn:   parent
+                                        color:              badge._on ? "white" : "#888888"
+                                        font.pointSize:     ScreenTools.smallFontPointSize * 0.85
+                                        font.bold:          badge._on
+                                    }
 
-                                            width:          badgeText.width  + ScreenTools.defaultFontPixelWidth
-                                            height:         badgeText.height + ScreenTools.defaultFontPixelWidth * 0.3
-                                            radius:         ScreenTools.defaultFontPixelWidth * 0.25
-                                            color:          _on ? "#1976D2" : "#222222"
-                                            border.color:   _on ? "#80DEEA"
-                                                                : (badgeMouse.containsMouse ? "#666666" : "#444444")
-                                            border.width:   1
-
-                                            QGCLabel {
-                                                id:                 badgeText
-                                                text:               modelData
-                                                anchors.centerIn:   parent
-                                                color:              badge._on ? "white" : "#888888"
-                                                font.pointSize:     ScreenTools.smallFontPointSize * 0.85
-                                                font.bold:          badge._on
-                                            }
-
-                                            MouseArea {
-                                                id:             badgeMouse
-                                                anchors.fill:   parent
-                                                hoverEnabled:   true
-                                                cursorShape:    Qt.PointingHandCursor
-                                                onClicked: {
-                                                    if (!paramRow._fact) return
-                                                    // XOR-toggle the bit and
-                                                    // write back. The Fact's
-                                                    // rawValueChanged signal
-                                                    // re-evaluates _value for
-                                                    // everyone bound to it.
-                                                    var newVal = (paramRow._value ^ badge._bitMask) >>> 0
-                                                    paramRow._fact.rawValue = newVal
-                                                }
-                                            }
+                                    MouseArea {
+                                        id:             badgeMouse
+                                        anchors.fill:   parent
+                                        hoverEnabled:   true
+                                        cursorShape:    Qt.PointingHandCursor
+                                        onClicked: {
+                                            if (!paramRow._fact) return
+                                            var newVal = (paramRow._value ^ badge._bitMask) >>> 0
+                                            paramRow._fact.rawValue = newVal
                                         }
                                     }
                                 }
