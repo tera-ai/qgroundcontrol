@@ -98,12 +98,14 @@ elseif(LINUX)
         FILES "${QGC_APPIMAGE_APPRUN_PATH}"
         DESTINATION "${CMAKE_BINARY_DIR}/"
     )
-    # Pass variables to AppImage creation script
+    # Pass variables to AppImage creation script. Quote each value so any
+    # future setting that contains spaces survives without being split into
+    # multiple list elements when this code runs at install time.
     install(CODE "
-        set(CMAKE_PROJECT_NAME ${CMAKE_PROJECT_NAME})
-        set(CMAKE_PROJECT_VERSION ${CMAKE_PROJECT_VERSION})
-        set(QGC_PACKAGE_NAME ${QGC_PACKAGE_NAME})
-        set(CMAKE_SYSTEM_PROCESSOR ${CMAKE_SYSTEM_PROCESSOR})
+        set(CMAKE_PROJECT_NAME \"${CMAKE_PROJECT_NAME}\")
+        set(CMAKE_PROJECT_VERSION \"${CMAKE_PROJECT_VERSION}\")
+        set(QGC_PACKAGE_NAME \"${QGC_PACKAGE_NAME}\")
+        set(CMAKE_SYSTEM_PROCESSOR \"${CMAKE_SYSTEM_PROCESSOR}\")
     ")
     install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/install/CreateAppImage.cmake")
 
@@ -111,11 +113,14 @@ elseif(LINUX)
 # Windows Installation & Installer Creation
 # ----------------------------------------------------------------------------
 elseif(WIN32)
-    # Pass variables to Windows installer creation script
+    # Pass variables to Windows installer creation script. Each value is
+    # double-quoted so values containing spaces (e.g. QGC_ORG_NAME = "Tera AI")
+    # don't get re-tokenized into a CMake list of two elements when the install
+    # script runs.
     install(CODE "
-        set(CMAKE_PROJECT_NAME ${CMAKE_PROJECT_NAME})
-        set(CMAKE_PROJECT_VERSION ${CMAKE_PROJECT_VERSION})
-        set(QGC_ORG_NAME ${QGC_ORG_NAME})
+        set(CMAKE_PROJECT_NAME \"${CMAKE_PROJECT_NAME}\")
+        set(CMAKE_PROJECT_VERSION \"${CMAKE_PROJECT_VERSION}\")
+        set(QGC_ORG_NAME \"${QGC_ORG_NAME}\")
         set(QGC_WINDOWS_ICON_PATH \"${QGC_WINDOWS_ICON_PATH}\")
         set(QGC_WINDOWS_INSTALL_HEADER_PATH \"${QGC_WINDOWS_INSTALL_HEADER_PATH}\")
         if(CMAKE_CROSSCOMPILING)

@@ -20,10 +20,11 @@ set(QGC_APP_COPYRIGHT "Copyright (c) Tera AI. Based on QGroundControl (MAVLink).
 set(QGC_APP_DESCRIPTION "Tera Ground Control - Custom QGC for Tera AI hybrid navigation systems" CACHE STRING "Application description")
 set(QGC_ORG_NAME "Tera AI" CACHE STRING "Organization name")
 set(QGC_ORG_DOMAIN "tera-ai.com" CACHE STRING "Organization domain")
-# Reverse-DNS package identifier (also used as macOS bundle id and Android package id).
-# The Linux AppStream <id> in deploy/linux/org.mavlink.qgroundcontrol.appdata.xml.in is
-# kept on the legacy id for upgrade-path compatibility with existing installs.
-set(QGC_PACKAGE_NAME "com.tera-ai.tgc" CACHE STRING "Package identifier")
+# Reverse-DNS package identifier. Used as the Android package id, the macOS /
+# iOS bundle id, the Linux AppStream <id>, and the Linux .desktop file id.
+# Hyphens are intentionally avoided (Android forbids them in package names),
+# so the company hyphen is collapsed to an underscore: tera-ai.com -> tera_ai.
+set(QGC_PACKAGE_NAME "com.tera_ai.tgc" CACHE STRING "Package identifier")
 
 # Settings version - increment to clear stored settings on next boot after incompatible changes
 set(QGC_SETTINGS_VERSION "9" CACHE STRING "Settings schema version")

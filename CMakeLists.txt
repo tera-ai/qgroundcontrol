@@ -93,7 +93,7 @@ endif()
 # and the Linux .desktop Name= field via QGC_APP_NAME directly.
 project(QGroundControl
     VERSION ${QGC_APP_VERSION}
-    DESCRIPTION ${QGC_APP_DESCRIPTION}
+    DESCRIPTION "${QGC_APP_DESCRIPTION}"
     HOMEPAGE_URL "https://${QGC_ORG_DOMAIN}"
     LANGUAGES C CXX
 )
