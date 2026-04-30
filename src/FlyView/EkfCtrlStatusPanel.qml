@@ -15,13 +15,13 @@ import QGroundControl
 import QGroundControl.Controls
 import QGroundControl.FactControls
 
-// Always-visible debug panel for ArduPilot EKF "control" parameters
-// (EK2/EK3/EKF2/EKF3 _EV_CTRL and _GPS_CTRL).
+// Always-visible debug panel for ArduPilot EKF2 "control" parameters
+// (EKF2_EV_CTRL and EKF2_GPS_CTRL).
 //
-// One row per known param. If a param doesn't exist on the connected
-// autopilot (e.g. PX4, or before the param list has loaded) the row
-// renders "Null/NA" in place of the value + bit badges, so the panel is
-// useful as a diagnostic even when nothing is wired up yet.
+// One row per param. If a param doesn't exist on the connected autopilot
+// (e.g. PX4, or before the param list has loaded) the row renders
+// "Null/NA" in place of the value + bit badges, so the panel is useful
+// as a diagnostic even when nothing is wired up yet.
 //
 // Each row's bitmask is rendered as a row of clickable badges. Clicking a
 // badge toggles that bit and writes the new value back through the Fact
@@ -137,14 +137,8 @@ Item {
 
                 Repeater {
                     model: [
-                        { name: "EK2_EV_CTRL",   bits: rowsRoot._evCtrlBits  },
-                        { name: "EK2_GPS_CTRL",  bits: rowsRoot._gpsCtrlBits },
                         { name: "EKF2_EV_CTRL",  bits: rowsRoot._evCtrlBits  },
-                        { name: "EKF2_GPS_CTRL", bits: rowsRoot._gpsCtrlBits },
-                        { name: "EK3_EV_CTRL",   bits: rowsRoot._evCtrlBits  },
-                        { name: "EK3_GPS_CTRL",  bits: rowsRoot._gpsCtrlBits },
-                        { name: "EKF3_EV_CTRL",  bits: rowsRoot._evCtrlBits  },
-                        { name: "EKF3_GPS_CTRL", bits: rowsRoot._gpsCtrlBits }
+                        { name: "EKF2_GPS_CTRL", bits: rowsRoot._gpsCtrlBits }
                     ]
 
                     // One row per known param. If the param exists, show
