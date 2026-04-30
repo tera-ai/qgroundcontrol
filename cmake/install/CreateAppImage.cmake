@@ -9,7 +9,11 @@
 message(STATUS "QGC: Creating AppImage...")
 
 set(APPDIR_PATH "${CMAKE_BINARY_DIR}/AppDir")
-set(APPIMAGE_PATH "${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}-${CMAKE_SYSTEM_PROCESSOR}.AppImage")
+# AppImage filename + bundled binary/icon names come from QGC_APP_NAME so the
+# rebrand surfaces in the .AppImage filename, the desktop entry, and the binary
+# inside the AppDir. linuxdeploy validates that the .desktop Exec= matches the
+# binary on disk, so all three must agree.
+set(APPIMAGE_PATH "${CMAKE_BINARY_DIR}/${QGC_APP_NAME}-${CMAKE_SYSTEM_PROCESSOR}.AppImage")
 
 # ============================================================================
 # Helper Functions
@@ -55,10 +59,10 @@ message(STATUS "QGC: Bundling runtime dependencies with linuxdeploy...")
 execute_process(
     COMMAND "${LINUXDEPLOY_PATH}"
             --appdir "${APPDIR_PATH}"
-            --executable "${APPDIR_PATH}/usr/bin/${CMAKE_PROJECT_NAME}"
+            --executable "${APPDIR_PATH}/usr/bin/${QGC_APP_NAME}"
             --desktop-file "${APPDIR_PATH}/usr/share/applications/${QGC_PACKAGE_NAME}.desktop"
             --custom-apprun "${CMAKE_BINARY_DIR}/AppRun"
-            --icon-file "${APPDIR_PATH}/usr/share/icons/hicolor/256x256/apps/${CMAKE_PROJECT_NAME}.png"
+            --icon-file "${APPDIR_PATH}/usr/share/icons/hicolor/256x256/apps/${QGC_APP_NAME}.png"
     COMMAND_ECHO STDOUT
     COMMAND_ERROR_IS_FATAL ANY
 )

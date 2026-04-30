@@ -6,7 +6,11 @@
 # ----------------------------------------------------------------------------
 # Basic Package Information
 # ----------------------------------------------------------------------------
-set(CPACK_PACKAGE_NAME "${CMAKE_PROJECT_NAME}")
+# CPack-generated artifact basename and Start-Menu folder use the user-facing
+# brand (QGC_APP_NAME = TGroundControl) so generated DEB/RPM/NSIS files don't
+# leak the legacy "QGroundControl" name. CMAKE_PROJECT_NAME stays as the CMake
+# target identifier; user-facing names live in QGC_APP_NAME.
+set(CPACK_PACKAGE_NAME "${QGC_APP_NAME}")
 # Quoted: QGC_ORG_NAME ("Tera AI") and PROJECT_DESCRIPTION can contain spaces;
 # without quotes, CMake list-tokenizes them and CPack ends up with garbage.
 set(CPACK_PACKAGE_VENDOR "${QGC_ORG_NAME}")
@@ -23,7 +27,8 @@ set(CPACK_PACKAGE_HOMEPAGE_URL "${PROJECT_HOMEPAGE_URL}")
 # Package Files and Directories
 # ----------------------------------------------------------------------------
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CPACK_SYSTEM_NAME}")
-set(CPACK_PACKAGE_INSTALL_DIRECTORY ${CMAKE_PROJECT_NAME})
+# Default install directory under Program Files / /opt also follows the brand.
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "${QGC_APP_NAME}")
 set(CPACK_PACKAGE_ICON "${CMAKE_SOURCE_DIR}/resources/icons/qgroundcontrol.png")
 # set(CPACK_PACKAGE_CHECKSUM "")
 # set(CPACK_PROJECT_CONFIG_FILE "")
@@ -41,7 +46,9 @@ set(CPACK_RESOURCE_FILE_README "${CMAKE_SOURCE_DIR}/README.md")
 # set(CPACK_MONOLITHIC_INSTALL
 # set(CPACK_GENERATOR
 # set(CPACK_OUTPUT_CONFIG_FILE
-set(CPACK_PACKAGE_EXECUTABLES ${CMAKE_PROJECT_NAME})
+# Executable basename for CPack-generated shortcuts. Must match the actual
+# binary on disk, which is renamed to QGC_APP_NAME by OUTPUT_NAME.
+set(CPACK_PACKAGE_EXECUTABLES "${QGC_APP_NAME}")
 # set(CPACK_STRIP_FILES
 set(CPACK_VERBATIM_VARIABLES ON)
 set(CPACK_THREADS -4)

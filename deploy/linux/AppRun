@@ -52,8 +52,10 @@ export XDG_DATA_DIRS="${APPDIR}/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr
 
 # Find the main executable (prefer known names, fall back to first executable)
 QGC_BINARY=""
-# Try known binary names first for security (prevents malicious binary injection)
-for expected_name in QGroundControl Custom-QGroundControl; do
+# Try known binary names first for security (prevents malicious binary injection).
+# TGroundControl is the Tera AI rebrand binary; QGroundControl is kept for
+# backward compatibility with older AppDirs and upstream-built artifacts.
+for expected_name in TGroundControl QGroundControl Custom-QGroundControl; do
     if [ -x "${APPDIR}/usr/bin/${expected_name}" ] && [ -f "${APPDIR}/usr/bin/${expected_name}" ]; then
         QGC_BINARY="${APPDIR}/usr/bin/${expected_name}"
         break

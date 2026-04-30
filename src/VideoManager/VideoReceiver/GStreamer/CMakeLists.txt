@@ -117,7 +117,7 @@ if(TARGET gstqml6gl)
         if(GSTREAMER_FRAMEWORK)
             install(
                 DIRECTORY "${GSTREAMER_FRAMEWORK}"
-                DESTINATION "${CMAKE_INSTALL_PREFIX}/${CMAKE_PROJECT_NAME}.app/Contents/Frameworks"
+                DESTINATION "${CMAKE_INSTALL_PREFIX}/${QGC_APP_NAME}.app/Contents/Frameworks"
                 PATTERN "*.la" EXCLUDE
                 PATTERN "*.a" EXCLUDE
                 PATTERN "*/bin" EXCLUDE

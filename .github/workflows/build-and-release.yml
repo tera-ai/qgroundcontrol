@@ -31,12 +31,12 @@ jobs:
           - os: windows-2022
             host: windows
             arch: win64_msvc2022_64
-            package: QGroundControl-installer-AMD64
+            package: TGroundControl-installer-AMD64
 
           - os: windows-11-arm
             host: windows_arm64
             arch: win64_msvc2022_arm64
-            package: QGroundControl-installer-ARM64
+            package: TGroundControl-installer-ARM64
 
           # TODO: Remove qt_version override once aqtinstall supports Qt 6.10.1+ for cross-compiled ARM64
           # Workaround: Pin to Qt 6.10.0 until aqtinstall fix is released
@@ -44,7 +44,7 @@ jobs:
           - os: windows-2022
             host: windows
             arch: win64_msvc2022_arm64_cross_compiled
-            package: QGroundControl-installer-AMD64-ARM64
+            package: TGroundControl-installer-AMD64-ARM64
             qt_version: '6.10.0'
 
     defaults:
@@ -116,7 +116,7 @@ jobs:
       - name: Verify Executable
         if: matrix.arch != 'win64_msvc2022_arm64_cross_compiled'
         working-directory: ${{ runner.temp }}\build\Release
-        run: QGroundControl.exe --simple-boot-test
+        run: TGroundControl.exe --simple-boot-test
 
       - name: Create Installer
         working-directory: ${{ runner.temp }}\build
@@ -203,8 +203,8 @@ jobs:
       - name: Upload macOS artifact
         uses: ./.github/actions/upload
         with:
-          artifact_name: QGroundControl.dmg
-          package_name: QGroundControl
+          artifact_name: TGroundControl.dmg
+          package_name: TGroundControl
           aws_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws_distribution_id: ${{ secrets.AWS_DISTRIBUTION_ID }}
@@ -219,12 +219,12 @@ jobs:
       matrix:
         include:
           - os: ubuntu-22.04
-            package: QGroundControl-x86_64
+            package: TGroundControl-x86_64
             host: linux
             arch: linux_gcc_64
 
           - os: ubuntu-24.04-arm
-            package: QGroundControl-aarch64
+            package: TGroundControl-aarch64
             host: linux_arm64
             arch: linux_gcc_arm64
 
@@ -286,7 +286,7 @@ jobs:
 
       - name: Verify Executable
         working-directory: ${{ runner.temp }}/build/Release
-        run: xvfb-run -a ./QGroundControl --simple-boot-test
+        run: xvfb-run -a ./TGroundControl --simple-boot-test
 
       - name: Create AppImage
         working-directory: ${{ runner.temp }}/build
@@ -329,12 +329,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/QGroundControl-installer-AMD64/QGroundControl-installer-AMD64.exe
-            artifacts/QGroundControl-installer-ARM64/QGroundControl-installer-ARM64.exe
-            artifacts/QGroundControl-installer-AMD64-ARM64/QGroundControl-installer-AMD64-ARM64.exe
-            artifacts/QGroundControl/QGroundControl.dmg
-            artifacts/QGroundControl-x86_64/QGroundControl-x86_64.AppImage
-            artifacts/QGroundControl-aarch64/QGroundControl-aarch64.AppImage
+            artifacts/TGroundControl-installer-AMD64/TGroundControl-installer-AMD64.exe
+            artifacts/TGroundControl-installer-ARM64/TGroundControl-installer-ARM64.exe
+            artifacts/TGroundControl-installer-AMD64-ARM64/TGroundControl-installer-AMD64-ARM64.exe
+            artifacts/TGroundControl/TGroundControl.dmg
+            artifacts/TGroundControl-x86_64/TGroundControl-x86_64.AppImage
+            artifacts/TGroundControl-aarch64/TGroundControl-aarch64.AppImage
           generate_release_notes: true
           draft: false
           prerelease: false

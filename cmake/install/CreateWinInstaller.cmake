@@ -48,8 +48,12 @@ set(_nsis_args
     /NOCD
     /INPUTCHARSET UTF8
     /V4
-    "/DAPPNAME=${CMAKE_PROJECT_NAME}"
-    "/DEXENAME=${CMAKE_PROJECT_NAME}"
+    # APPNAME is the user-visible product name (Start Menu folder, ARP entry,
+    # uninstall registry key). EXENAME is the on-disk filename written by the
+    # build (matches the target's OUTPUT_NAME). Both come from QGC_APP_NAME so
+    # rebranding only requires editing cmake/CustomOptions.cmake.
+    "/DAPPNAME=${QGC_APP_NAME}"
+    "/DEXENAME=${QGC_APP_NAME}"
     "/DORGNAME=${QGC_ORG_NAME}"
     "/DDESTDIR=${QGC_PAYLOAD_DIR}"
 )

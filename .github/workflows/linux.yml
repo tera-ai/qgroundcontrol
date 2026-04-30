@@ -55,12 +55,12 @@ jobs:
         os: [ubuntu-24.04-arm, ubuntu-22.04]
         include:
           - os: ubuntu-24.04-arm
-            package: QGroundControl-aarch64
+            package: TGroundControl-aarch64
             host: linux_arm64
             arch: linux_gcc_arm64
 
           - os: ubuntu-22.04
-            package: QGroundControl-x86_64
+            package: TGroundControl-x86_64
             host: linux
             arch: linux_gcc_64
 
@@ -159,7 +159,7 @@ jobs:
         run: |
           export QT_QPA_PLATFORM=offscreen
           export QT_LOGGING_RULES="*=false"
-          ./QGroundControl --unittest --unittest-output:junit-results.xml || true
+          ./TGroundControl --unittest --unittest-output:junit-results.xml || true
         continue-on-error: true
 
       - name: Upload Test Results
@@ -190,7 +190,7 @@ jobs:
       - name: Verify Executable
         if: matrix.build_type == 'Release'
         working-directory: ${{ runner.temp }}/build/${{ matrix.build_type }}
-        run: xvfb-run -a ./QGroundControl --simple-boot-test
+        run: xvfb-run -a ./TGroundControl --simple-boot-test
 
       - name: Create AppImage
         working-directory: ${{ runner.temp }}/build

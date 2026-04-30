@@ -253,12 +253,18 @@ list(APPEND QGC_RESOURCES
 # QGroundControl Executable Target
 # ============================================================================
 
-# Create the main executable
+# Create the main executable. We keep the CMake target name as CMAKE_PROJECT_NAME
+# (= "QGroundControl") for upstream compatibility, but set OUTPUT_NAME so the
+# produced artifacts (binary, .exe, .app bundle, dSYM, .pdb, etc.) carry the
+# user-facing TGroundControl brand. The DMG name, AppImage name, NSIS installer
+# basename, Linux .desktop Exec= field and icon filenames are all derived from
+# this OUTPUT_NAME, so changing QGC_APP_NAME ripples through every artifact.
 qt_add_executable(${CMAKE_PROJECT_NAME}
     WIN32          # Windows GUI application
     MACOSX_BUNDLE  # macOS application bundle
     ${QGC_RESOURCES}
 )
+set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME "${QGC_APP_NAME}")
 
 # ----------------------------------------------------------------------------
 # Platform-Specific Configuration

@@ -21,10 +21,10 @@
       and odometry diagnostics for any MAVLink-enabled vehicle.
     </p>
   </description>
-  <icon type="stock">@CMAKE_PROJECT_NAME@</icon>
+  <icon type="stock">@QGC_APP_NAME@</icon>
 
   <provides>
-    <binary>@CMAKE_PROJECT_NAME@</binary>
+    <binary>@QGC_APP_NAME@</binary>
   </provides>
 
   <releases>

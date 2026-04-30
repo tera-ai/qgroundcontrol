@@ -27,17 +27,20 @@ set(CPACK_NSIS_MUI_UNIICON "${QGC_INSTALLER_SOURCE}/WindowsQGC.ico")
 # Install/Uninstall Commands
 # ----------------------------------------------------------------------------
 # set(CPACK_NSIS_EXTRA_PREINSTALL_COMMANDS "")
+# Start Menu folder + shortcut labels carry the user-facing brand. EXENAME is
+# the on-disk executable basename (TGroundControl.exe) which CPack injects from
+# CPACK_PACKAGE_EXECUTABLES.
 set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "
-    CreateDirectory \"\$SMPROGRAMS\\${CMAKE_PROJECT_NAME}\"
-    CreateShortCut \"\$SMPROGRAMS\\${CMAKE_PROJECT_NAME}\\${CMAKE_PROJECT_NAME}.lnk\" \"\$INSTDIR\\bin\\${EXENAME}.exe\" \"\" \"\$INSTDIR\\bin\\${EXENAME}.exe\" 0
-    CreateShortCut \"\$SMPROGRAMS\\${CMAKE_PROJECT_NAME}\\${CMAKE_PROJECT_NAME} (GPU Compatibility Mode).lnk\" \"\$INSTDIR\\bin\\${EXENAME}.exe\" \"-desktop\" \"\$INSTDIR\\bin\\${EXENAME}.exe\" 0
-    CreateShortCut \"\$SMPROGRAMS\\${CMAKE_PROJECT_NAME}\\${CMAKE_PROJECT_NAME} (GPU Safe Mode).lnk\" \"\$INSTDIR\\bin\\${EXENAME}.exe\" \"-swrast\" \"\$INSTDIR\\bin\\${EXENAME}.exe\" 0
+    CreateDirectory \"\$SMPROGRAMS\\${QGC_APP_NAME}\"
+    CreateShortCut \"\$SMPROGRAMS\\${QGC_APP_NAME}\\${QGC_APP_NAME}.lnk\" \"\$INSTDIR\\bin\\${EXENAME}.exe\" \"\" \"\$INSTDIR\\bin\\${EXENAME}.exe\" 0
+    CreateShortCut \"\$SMPROGRAMS\\${QGC_APP_NAME}\\${QGC_APP_NAME} (GPU Compatibility Mode).lnk\" \"\$INSTDIR\\bin\\${EXENAME}.exe\" \"-desktop\" \"\$INSTDIR\\bin\\${EXENAME}.exe\" 0
+    CreateShortCut \"\$SMPROGRAMS\\${QGC_APP_NAME}\\${QGC_APP_NAME} (GPU Safe Mode).lnk\" \"\$INSTDIR\\bin\\${EXENAME}.exe\" \"-swrast\" \"\$INSTDIR\\bin\\${EXENAME}.exe\" 0
 ")
 set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "
-    Delete \"\$SMPROGRAMS\\${CMAKE_PROJECT_NAME}\\${CMAKE_PROJECT_NAME}.lnk\"
-    Delete \"\$SMPROGRAMS\\${CMAKE_PROJECT_NAME}\\${CMAKE_PROJECT_NAME} (GPU Compatibility Mode).lnk\"
-    Delete \"\$SMPROGRAMS\\${CMAKE_PROJECT_NAME}\\${CMAKE_PROJECT_NAME} (GPU Safe Mode).lnk\"
-    RMDir /r /REBOOTOK \"\$SMPROGRAMS\\${CMAKE_PROJECT_NAME}\"
+    Delete \"\$SMPROGRAMS\\${QGC_APP_NAME}\\${QGC_APP_NAME}.lnk\"
+    Delete \"\$SMPROGRAMS\\${QGC_APP_NAME}\\${QGC_APP_NAME} (GPU Compatibility Mode).lnk\"
+    Delete \"\$SMPROGRAMS\\${QGC_APP_NAME}\\${QGC_APP_NAME} (GPU Safe Mode).lnk\"
+    RMDir /r /REBOOTOK \"\$SMPROGRAMS\\${QGC_APP_NAME}\"
 ")
 # ----------------------------------------------------------------------------
 # Installer Options
@@ -57,7 +60,7 @@ set(CPACK_NSIS_URL_INFO_ABOUT ${CPACK_PACKAGE_HOMEPAGE_URL})
 # set(CPACK_NSIS_EXECUTABLES_DIRECTORY "")
 # set(CPACK_NSIS_MUI_FINISHPAGE_RUN "")
 # set(CPACK_NSIS_MENU_LINKS "")
-set(CPACK_NSIS_UNINSTALL_NAME "${CMAKE_PROJECT_NAME}-Uninstall")
+set(CPACK_NSIS_UNINSTALL_NAME "${QGC_APP_NAME}-Uninstall")
 
 # ----------------------------------------------------------------------------
 # Installer UI Customization

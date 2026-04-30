@@ -78,12 +78,12 @@ elseif(LINUX)
     install(
         FILES "${QGC_APPIMAGE_ICON_256_PATH}"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps/"
-        RENAME ${CMAKE_PROJECT_NAME}.png
+        RENAME ${QGC_APP_NAME}.png
     )
     install(
         FILES "${QGC_APPIMAGE_ICON_SCALABLE_PATH}"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps/"
-        RENAME ${CMAKE_PROJECT_NAME}.svg
+        RENAME ${QGC_APP_NAME}.svg
     )
     configure_file(
         "${QGC_APPIMAGE_METADATA_PATH}"
@@ -104,6 +104,7 @@ elseif(LINUX)
     install(CODE "
         set(CMAKE_PROJECT_NAME \"${CMAKE_PROJECT_NAME}\")
         set(CMAKE_PROJECT_VERSION \"${CMAKE_PROJECT_VERSION}\")
+        set(QGC_APP_NAME \"${QGC_APP_NAME}\")
         set(QGC_PACKAGE_NAME \"${QGC_PACKAGE_NAME}\")
         set(CMAKE_SYSTEM_PROCESSOR \"${CMAKE_SYSTEM_PROCESSOR}\")
     ")
@@ -120,13 +121,14 @@ elseif(WIN32)
     install(CODE "
         set(CMAKE_PROJECT_NAME \"${CMAKE_PROJECT_NAME}\")
         set(CMAKE_PROJECT_VERSION \"${CMAKE_PROJECT_VERSION}\")
+        set(QGC_APP_NAME \"${QGC_APP_NAME}\")
         set(QGC_ORG_NAME \"${QGC_ORG_NAME}\")
         set(QGC_WINDOWS_ICON_PATH \"${QGC_WINDOWS_ICON_PATH}\")
         set(QGC_WINDOWS_INSTALL_HEADER_PATH \"${QGC_WINDOWS_INSTALL_HEADER_PATH}\")
         if(CMAKE_CROSSCOMPILING)
-            set(QGC_WINDOWS_OUT \"${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}-installer-${CMAKE_HOST_SYSTEM_PROCESSOR}-${CMAKE_SYSTEM_PROCESSOR}.exe\")
+            set(QGC_WINDOWS_OUT \"${CMAKE_BINARY_DIR}/${QGC_APP_NAME}-installer-${CMAKE_HOST_SYSTEM_PROCESSOR}-${CMAKE_SYSTEM_PROCESSOR}.exe\")
         else()
-            set(QGC_WINDOWS_OUT \"${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}-installer-${CMAKE_SYSTEM_PROCESSOR}.exe\")
+            set(QGC_WINDOWS_OUT \"${CMAKE_BINARY_DIR}/${QGC_APP_NAME}-installer-${CMAKE_SYSTEM_PROCESSOR}.exe\")
         endif()
         set(QGC_WINDOWS_INSTALLER_SCRIPT \"${CMAKE_SOURCE_DIR}/deploy/windows/nullsoft_installer.nsi\")
     ")
@@ -137,7 +139,12 @@ elseif(WIN32)
 # ----------------------------------------------------------------------------
 elseif(MACOS)
     # Set bundle path for subsequent operations
-    install(CODE "set(QGC_STAGING_BUNDLE_PATH \"${CMAKE_BINARY_DIR}/staging/${CMAKE_PROJECT_NAME}.app\")")
+    # The .app bundle on disk is named after the target's OUTPUT_NAME (which we
+    # set to QGC_APP_NAME). CreateMacDMG.cmake derives the DMG file name and
+    # volume name from this bundle's stem, so changing QGC_APP_NAME alone
+    # produces TGroundControl.app, TGroundControl.dmg and a volume mounted at
+    # /Volumes/TGroundControl/.
+    install(CODE "set(QGC_STAGING_BUNDLE_PATH \"${CMAKE_BINARY_DIR}/staging/${QGC_APP_NAME}.app\")")
 
     # Code signing
     if(QGC_MACOS_SIGN_WITH_IDENTITY)

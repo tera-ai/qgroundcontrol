@@ -28,7 +28,7 @@ jobs:
         shell: bash
 
     env:
-      PACKAGE: QGroundControl
+      PACKAGE: TGroundControl
 
     steps:
       - name: Harden Runner
