@@ -85,7 +85,13 @@ endif()
 # ----------------------------------------------------------------------------
 # Project Declaration
 # ----------------------------------------------------------------------------
-project(${QGC_APP_NAME}
+# NOTE: Project name is intentionally kept as the upstream "QGroundControl" so
+# the build target/binary file stays QGroundControl(.exe/.app), preserving every
+# CI step, installer, and packaging path inherited from upstream. The Tera AI
+# rebrand display name lives in QGC_APP_NAME and is plumbed through Qt
+# (setApplicationName), the Windows .rc product field, the macOS bundle name,
+# and the Linux .desktop Name= field via QGC_APP_NAME directly.
+project(QGroundControl
     VERSION ${QGC_APP_VERSION}
     DESCRIPTION ${QGC_APP_DESCRIPTION}
     HOMEPAGE_URL "https://${QGC_ORG_DOMAIN}"
