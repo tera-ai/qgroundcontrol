@@ -854,10 +854,29 @@ void Vehicle::_handleOdometry(mavlink_message_t& message)
     }
     
     // Add odometry point to path tracking (x=north, y=east, z=down in NED frame)
-    // frame_id should be MAV_FRAME_LOCAL_NED (1) or MAV_FRAME_BODY_NED (8)
-    // estimator_type: 0=Mapping, 1=Tracking, 2=Propagation
+    // frame_id should be MAV_FRAME_LOCAL_NED (1) or MAV_FRAME_BODY_NED (8).
+    //
+    // The Tera publisher repurposes ODOMETRY.quality as a state code rather
+    // than the standard 0-100 quality metric:
+    //   100 -> MAPPING        (current_matching_state == 0)
+    //    99 -> TRACKING       (current_matching_state == 1)
+    //    98 -> PROPAGATION    (current_matching_state == 2, including
+    //                          forced-propagation dead-reckoning)
+    // Anything else is treated as PROPAGATION too so we still plot it but
+    // gate it behind the "Plot Propagation" toggle. odom.estimator_type is
+    // ignored intentionally: the publisher does not set it consistently.
+    int estimatorType = OdometryPathPoints::Propagation;
+    switch (odom.quality) {
+    case 100: estimatorType = OdometryPathPoints::Mapping;     break;
+    case  99: estimatorType = OdometryPathPoints::Tracking;    break;
+    case  98: estimatorType = OdometryPathPoints::Propagation; break;
+    default:
+        qCDebug(VehicleLog) << "ODOMETRY unknown quality state" << odom.quality
+                            << "- treating as PROPAGATION";
+        break;
+    }
     _odometryPathPoints->addOdometryPoint(odom.time_usec, odom.q,
-                                          odom.x, odom.y, odom.z, odom.estimator_type);
+                                          odom.x, odom.y, odom.z, estimatorType);
 }
 
 // TODO: VehicleFactGroup
