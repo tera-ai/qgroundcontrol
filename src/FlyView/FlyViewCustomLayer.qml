@@ -26,8 +26,7 @@ Item {
     property bool _showNavError:    QGroundControl.settingsManager.flyViewSettings.showNavErrorPanel.rawValue
 
     // Toggleable: when true, the Odometry Telemetry panel exposes the
-    // odom-derived roll/pitch/yaw rows AND the artificial horizon overlay is
-    // driven by the odometry attitude instead of the vehicle facts.
+    // odom-derived roll/pitch/yaw rows.
     property bool _showOdomAttitude: false
 
     // Path overlay toggle controls
@@ -834,69 +833,20 @@ Item {
         }
     }
 
-    // Standalone artificial horizon overlay (top-left). Always visible when
-    // an active vehicle exists, mirroring the legacy QGC look. When
-    // _showOdomAttitude is on AND odom attitude is valid, drive it from
-    // odometry instead of the vehicle facts.
-    Item {
-        id:                 attitudeOverlay
-        anchors.left:       parent.left
-        anchors.top:        parent.top
-        anchors.leftMargin: ScreenTools.defaultFontPixelWidth
-        anchors.topMargin:  parentToolInsets.topEdgeLeftInset + ScreenTools.defaultFontPixelWidth
-        width:              ScreenTools.defaultFontPixelHeight * 7
-        height:             width
-        visible:            _activeVehicle
-
-        property var  _odomPts:    _activeVehicle ? _activeVehicle.odometryPathPoints : null
-        property bool _useOdomAtt: _showOdomAttitude && _odomPts
-                                   && !isNaN(_odomPts.odomRollDeg)
-                                   && !isNaN(_odomPts.odomPitchDeg)
-
-        QGCAttitudeWidget {
-            anchors.fill:           parent
-            size:                   parent.width
-            vehicle:                _activeVehicle
-            showHeading:            true
-            overrideEnabled:        attitudeOverlay._useOdomAtt
-            overrideRollDeg:        attitudeOverlay._odomPts ? attitudeOverlay._odomPts.odomRollDeg  : 0
-            overridePitchDeg:       attitudeOverlay._odomPts ? attitudeOverlay._odomPts.odomPitchDeg : 0
-            overrideHeadingDeg:     attitudeOverlay._odomPts
-                                    ? (((attitudeOverlay._odomPts.odomYawDeg % 360) + 360) % 360)
-                                    : 0
-        }
-
-        // Tiny "AHRS" / "ODOM" source tag overlaid on the bottom-left
-        QGCLabel {
-            anchors.bottom:         parent.bottom
-            anchors.left:           parent.left
-            anchors.margins:        ScreenTools.defaultFontPixelWidth * 0.5
-            text:                   attitudeOverlay._useOdomAtt ? qsTr("ODOM") : qsTr("AHRS")
-            color:                  attitudeOverlay._useOdomAtt ? "#536DFF" : "#FFD700"
-            font.bold:              true
-            font.pointSize:         ScreenTools.smallFontPointSize * 0.85
-            style:                  Text.Outline
-            styleColor:             "black"
-        }
-    }
-
     // EKF Control parameter status panel (EK2/EK3 EV_CTRL & GPS_CTRL).
     // Self-hides if none of the params exist on the connected autopilot.
     EkfCtrlStatusPanel {
         id:                     ekfCtrlPanel
         anchors.left:           parent.left
-        anchors.top:            attitudeOverlay.visible ? attitudeOverlay.bottom : parent.top
+        anchors.top:            parent.top
         anchors.leftMargin:     ScreenTools.defaultFontPixelWidth
-        anchors.topMargin:      attitudeOverlay.visible
-                                    ? ScreenTools.defaultFontPixelHeight * 1.6
-                                    : parentToolInsets.topEdgeLeftInset + ScreenTools.defaultFontPixelWidth
+        anchors.topMargin:      parentToolInsets.topEdgeLeftInset + ScreenTools.defaultFontPixelWidth
     }
 
     // since this file is a placeholder for the custom layer in a standard build, we will just pass through the parent insets
     QGCToolInsets {
         id:                     _toolInsets
         leftEdgeTopInset:       parentToolInsets.leftEdgeTopInset
-                                    + (attitudeOverlay.visible ? attitudeOverlay.height + ScreenTools.defaultFontPixelHeight * 1.6 : 0)
                                     + (ekfCtrlPanel.visible ? ekfCtrlPanel.height + ScreenTools.defaultFontPixelWidth : 0)
         leftEdgeCenterInset:    parentToolInsets.leftEdgeCenterInset
         leftEdgeBottomInset:    parentToolInsets.leftEdgeBottomInset
@@ -904,7 +854,6 @@ Item {
         rightEdgeCenterInset:   parentToolInsets.rightEdgeCenterInset
         rightEdgeBottomInset:   parentToolInsets.rightEdgeBottomInset + (gpsTelemetryPanel.visible ? gpsTelemetryPanel.height + ScreenTools.defaultFontPixelWidth : 0)
         topEdgeLeftInset:       parentToolInsets.topEdgeLeftInset
-                                    + (attitudeOverlay.visible ? attitudeOverlay.width + ScreenTools.defaultFontPixelWidth : 0)
                                     + (ekfCtrlPanel.visible ? ekfCtrlPanel.width + ScreenTools.defaultFontPixelWidth : 0)
         topEdgeCenterInset:     parentToolInsets.topEdgeCenterInset
         topEdgeRightInset:      parentToolInsets.topEdgeRightInset + (pathControlPanel.visible ? pathControlPanel.height + ScreenTools.defaultFontPixelWidth * 2 : 0) + (systemControlPanel.visible ? systemControlPanel.height + ScreenTools.defaultFontPixelWidth : 0)
