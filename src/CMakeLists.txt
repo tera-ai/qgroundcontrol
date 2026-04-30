@@ -202,7 +202,10 @@ endif()
 set_target_properties(${CMAKE_PROJECT_NAME}
     PROPERTIES
         QT_RESOURCE_PREFIX "/qml"
-        OUTPUT_NAME ${CMAKE_PROJECT_NAME}
+        # OUTPUT_NAME is set in the root CMakeLists.txt to QGC_APP_NAME so
+        # the produced .app bundle / .exe / Linux binary carry the user-facing
+        # brand. Do NOT re-set it to CMAKE_PROJECT_NAME here or you'll undo
+        # the rename and break the CI workflows that look for TGroundControl.
 )
 
 # ----------------------------------------------------------------------------
