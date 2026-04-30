@@ -12,12 +12,18 @@ include(BuildConfig)
 # Application Metadata
 # ============================================================================
 
-set(QGC_APP_NAME "QGroundControl" CACHE STRING "Application name")
-set(QGC_APP_COPYRIGHT "Copyright (c) 2025 QGroundControl. All rights reserved." CACHE STRING "Copyright notice")
-set(QGC_APP_DESCRIPTION "Open Source Ground Control App" CACHE STRING "Application description")
-set(QGC_ORG_NAME "QGroundControl" CACHE STRING "Organization name")
-set(QGC_ORG_DOMAIN "qgroundcontrol.com" CACHE STRING "Organization domain")
-set(QGC_PACKAGE_NAME "org.mavlink.qgroundcontrol" CACHE STRING "Package identifier")
+# Brand strings for Tera AI's TGroundControl fork.
+# Raster icons (.ico/.icns/.png) are regenerated from resources/tera_brand/
+# via tools/build/gen_icons.py whenever the mark changes.
+set(QGC_APP_NAME "TGroundControl" CACHE STRING "Application name")
+set(QGC_APP_COPYRIGHT "Copyright (c) Tera AI. Based on QGroundControl (MAVLink)." CACHE STRING "Copyright notice")
+set(QGC_APP_DESCRIPTION "Tera Ground Control - Custom QGC for Tera AI hybrid navigation systems" CACHE STRING "Application description")
+set(QGC_ORG_NAME "Tera AI" CACHE STRING "Organization name")
+set(QGC_ORG_DOMAIN "tera-ai.com" CACHE STRING "Organization domain")
+# Reverse-DNS package identifier (also used as macOS bundle id and Android package id).
+# The Linux AppStream <id> in deploy/linux/org.mavlink.qgroundcontrol.appdata.xml.in is
+# kept on the legacy id for upgrade-path compatibility with existing installs.
+set(QGC_PACKAGE_NAME "com.tera-ai.tgc" CACHE STRING "Package identifier")
 
 # Settings version - increment to clear stored settings on next boot after incompatible changes
 set(QGC_SETTINGS_VERSION "9" CACHE STRING "Settings schema version")
@@ -130,7 +136,7 @@ set(QGC_APPIMAGE_ICON_SCALABLE_PATH "${CMAKE_SOURCE_DIR}/deploy/linux/QGroundCon
 set(QGC_APPIMAGE_APPRUN_PATH "${CMAKE_SOURCE_DIR}/deploy/linux/AppRun" CACHE FILEPATH "AppImage AppRun script path")
 set(QGC_APPIMAGE_DESKTOP_ENTRY_PATH "${CMAKE_SOURCE_DIR}/deploy/linux/org.mavlink.qgroundcontrol.desktop.in" CACHE FILEPATH "AppImage desktop entry path")
 set(QGC_APPIMAGE_METADATA_PATH "${CMAKE_SOURCE_DIR}/deploy/linux/org.mavlink.qgroundcontrol.appdata.xml.in" CACHE FILEPATH "AppImage metadata path")
-set(QGC_APPIMAGE_APPDATA_DEVELOPER "qgroundcontrol" CACHE STRING "AppImage developer name")
+set(QGC_APPIMAGE_APPDATA_DEVELOPER "tera-ai" CACHE STRING "AppImage developer name")
 
 # ----------------------------------------------------------------------------
 # Windows Platform

@@ -95,6 +95,7 @@ public:
 
     Q_PROPERTY(QString qgcVersion       READ qgcVersion         CONSTANT)
     Q_PROPERTY(QString qgcAppDate       READ qgcAppDate         CONSTANT)
+    Q_PROPERTY(QString qgcGitHash       READ qgcGitHash         CONSTANT)
     Q_PROPERTY(bool    qgcDailyBuild    READ qgcDailyBuild      CONSTANT)
 
     Q_PROPERTY(qreal zOrderTopMost              READ zOrderTopMost              CONSTANT) ///< z order for top most items, toolbar, main window sub view
@@ -216,6 +217,11 @@ public:
 
     static QString qgcVersion();
     static QString qgcAppDate() { return QGC_APP_DATE; }
+#ifdef QGC_GIT_HASH
+    static QString qgcGitHash() { return QStringLiteral(QGC_GIT_HASH); }
+#else
+    static QString qgcGitHash() { return QString(); }
+#endif
 #ifdef QGC_DAILY_BUILD
     static bool qgcDailyBuild() { return true; }
 #else

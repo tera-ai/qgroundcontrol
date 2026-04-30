@@ -116,7 +116,7 @@ ToolIndicatorPage {
                 QGCLabel {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
-                    text: QGroundControl.qgcVersion
+                    text: QGroundControl.qgcVersion + (QGroundControl.qgcGitHash.length > 0 ? "  (" + QGroundControl.qgcGitHash + ")" : "")
                     font.pointSize: ScreenTools.smallFontPointSize
                     wrapMode: QGCLabel.WrapAnywhere
                 }

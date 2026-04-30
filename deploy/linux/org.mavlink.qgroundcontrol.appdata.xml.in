@@ -15,10 +15,10 @@
   <summary>@QGC_APP_DESCRIPTION@</summary>
   <description>
     <p>
-      QGroundControl (QGC) is a highly intuitive and powerful Ground Control Station (GCS) designed for UAVs.
-      Whether you're a first-time pilot or an experienced professional,
-      QGC provides a seamless user experience for flight control and mission planning,
-      making it the go-to solution for any MAVLink-enabled drone.
+      TGroundControl (TGC) is Tera AI's Ground Control Station, a custom fork of QGroundControl
+      tailored for hybrid navigation systems. It extends the upstream QGC mission planning and
+      flight monitoring experience with Tera-specific telemetry overlays, EKF control panels,
+      and odometry diagnostics for any MAVLink-enabled vehicle.
     </p>
   </description>
   <icon type="stock">@QGC_APP_NAME@</icon>
@@ -42,11 +42,11 @@
     </screenshot>
   </screenshots>
 
-  <url type="homepage">https://@QGC_ORG_DOMAIN@</url>
+  <url type="homepage">https://github.com/tera-ai/qgroundcontrol</url>
   <url type="help">https://docs.qgroundcontrol.com/master/en/index.html</url>
-  <url type="bugtracker">https://github.com/mavlink/qgroundcontrol/issues</url>
-  <url type="contact">https://docs.qgroundcontrol.com/master/en/qgc-user-guide/support/support.html</url>
-  <!-- <url type="contribute">https://github.com/mavlink/qgroundcontrol/blob/master/.github/CONTRIBUTING.md</url> -->
+  <url type="bugtracker">https://github.com/tera-ai/qgroundcontrol/issues</url>
+  <url type="contact">https://github.com/tera-ai/qgroundcontrol</url>
+  <!-- <url type="contribute">https://github.com/tera-ai/qgroundcontrol/blob/master/.github/CONTRIBUTING.md</url> -->
 
   <requires>
     <display_length>360</display_length>
