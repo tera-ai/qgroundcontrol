@@ -36,6 +36,11 @@ class TeraHybridMapBoundsController : public QObject
     Q_PROPERTY(QVariantList     coordinates READ coordinates NOTIFY boundsChanged)
 
 public:
+    /// Constructed exclusively via Q_APPLICATION_STATIC; clients must use
+    /// instance() instead of instantiating directly. Public-but-discouraged
+    /// because Qt's Q_APPLICATION_STATIC macro requires constructor access.
+    explicit TeraHybridMapBoundsController(QObject* parent = nullptr);
+
     static TeraHybridMapBoundsController* instance();
 
     /// Examine an inbound MAVLink message and, if it carries the TERA_MAP
@@ -50,8 +55,6 @@ signals:
     void boundsChanged();
 
 private:
-    explicit TeraHybridMapBoundsController(QObject* parent = nullptr);
-
     static bool _isAcceptedSysId(uint8_t sysId);
 
     bool                            _hasBounds = false;
