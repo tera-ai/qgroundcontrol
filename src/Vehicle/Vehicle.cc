@@ -40,6 +40,7 @@
 #include "TrajectoryPoints.h"
 #include "GpsPathPoints.h"
 #include "OdometryPathPoints.h"
+#include "TeraHybridMapBoundsController.h"
 #include "VehicleLinkManager.h"
 #include "VehicleObjectAvoidance.h"
 #include "VideoManager.h"
@@ -473,9 +474,12 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
 {
     if (message.sysid != _id && message.sysid != 0) {
         // We allow RADIO_STATUS messages which come from a link the vehicle is using to pass through and be handled
-        // We also allow ODOMETRY messages from system ID 77 (primary) or 255 (fallback) to pass through
+        // We also allow ODOMETRY messages from system ID 77 (primary) or 255 (fallback) to pass through.
+        // The tera-system1 hybrid pipeline announces its terrain footprint via DEBUG_FLOAT_ARRAY tagged
+        // "TERA_MAP" from the same companion sysids; let it through so the Fly View overlay can render.
         if (!(message.msgid == MAVLINK_MSG_ID_RADIO_STATUS && _vehicleLinkManager->containsLink(link)) &&
-            !(message.msgid == MAVLINK_MSG_ID_ODOMETRY && (message.sysid == 77 || message.sysid == 255))) {
+            !(message.msgid == MAVLINK_MSG_ID_ODOMETRY && (message.sysid == 77 || message.sysid == 255)) &&
+            !(message.msgid == MAVLINK_MSG_ID_DEBUG_FLOAT_ARRAY && (message.sysid == 77 || message.sysid == 255))) {
             return;
         }
     }
@@ -582,6 +586,11 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
         break;
     case MAVLINK_MSG_ID_ODOMETRY:
         _handleOdometry(message);
+        break;
+    case MAVLINK_MSG_ID_DEBUG_FLOAT_ARRAY:
+        // Forwarded by tera-system1's flight_controller as the "TERA_MAP"
+        // overlay payload; the controller filters the magic tag and sysid.
+        TeraHybridMapBoundsController::instance()->mavlinkMessageReceived(message);
         break;
     case MAVLINK_MSG_ID_ATTITUDE: {
         // Feed the autopilot's time_boot_ms into the odometry component so it

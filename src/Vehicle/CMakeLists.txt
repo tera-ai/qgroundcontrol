@@ -29,6 +29,8 @@ target_sources(${CMAKE_PROJECT_NAME}
         GpsPathPoints.h
         OdometryPathPoints.cc
         OdometryPathPoints.h
+        TeraHybridMapBoundsController.cc
+        TeraHybridMapBoundsController.h
         Vehicle.cc
         Vehicle.h
         VehicleLinkManager.cc

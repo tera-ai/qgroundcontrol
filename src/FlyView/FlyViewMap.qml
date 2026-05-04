@@ -242,6 +242,32 @@ FlightMap {
         showText: !pipMode
     }
 
+    // Tera hybrid map footprint (SW, NW, NE, SE) broadcast via DEBUG_FLOAT_ARRAY
+    // by tera-system1's flight_controller when a map loads. The polygon stays
+    // visible across vehicle disconnects and only updates when a new run sends
+    // different corners.
+    MapPolygon {
+        id:             teraMapBoundsPolygon
+        z:              QGroundControl.zOrderMapItems
+        visible:        !pipMode && teraHybridMapBounds.hasBounds
+        color:          Qt.rgba(1, 0.65, 0, 0.10)
+        border.width:   2
+        border.color:   "#FFA500"
+
+        function _refresh() {
+            teraMapBoundsPolygon.path = teraHybridMapBounds.hasBounds
+                ? teraHybridMapBounds.coordinates
+                : []
+        }
+
+        Component.onCompleted: _refresh()
+
+        Connections {
+            target: teraHybridMapBounds
+            function onBoundsChanged() { teraMapBoundsPolygon._refresh() }
+        }
+    }
+
     // Add trajectory lines to the map
     MapPolyline {
         id:         trajectoryPolyline

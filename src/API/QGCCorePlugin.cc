@@ -10,6 +10,7 @@
 #include "InstrumentValueData.h"
 #include "JoystickManager.h"
 #include "MAVLinkLib.h"
+#include "TeraHybridMapBoundsController.h"
 #include "QGCLoggingCategory.h"
 #include "QGCOptions.h"
 #include "QmlComponentInfo.h"
@@ -255,6 +256,7 @@ QQmlApplicationEngine *QGCCorePlugin::createQmlApplicationEngine(QObject *parent
     qmlEngine->addImportPath(QStringLiteral("qrc:/qml"));
     qmlEngine->rootContext()->setContextProperty(QStringLiteral("joystickManager"), JoystickManager::instance());
     qmlEngine->rootContext()->setContextProperty(QStringLiteral("debugMessageModel"), QGCLogging::instance());
+    qmlEngine->rootContext()->setContextProperty(QStringLiteral("teraHybridMapBounds"), TeraHybridMapBoundsController::instance());
     return qmlEngine;
 }
 
