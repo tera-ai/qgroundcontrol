@@ -1,61 +1,90 @@
-
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Dronecode/UX-Design/35d8148a8a0559cd4bcf50bfa2c94614983cce91/QGC/Branding/Deliverables/QGC_RGB_Logo_Horizontal_Positive_PREFERRED/QGC_RGB_Logo_Horizontal_Positive_PREFERRED.svg" alt="QGroundControl Logo" width="500">
+  <img src="resources/tera_brand/Logo%20-%20Color%20(light%20type)%20on%20transparent%20background.svg" alt="Tera Ground Control" width="420">
 </p>
 
 <p align="center">
-  <a href="https://github.com/mavlink/QGroundControl/releases">
-    <img src="https://img.shields.io/github/release/mavlink/QGroundControl.svg" alt="Latest Release">
-  </a>
+  <strong>Tera Ground Control</strong> (Teragroundcontrol) · Ground control for Tera’s hybrid navigation stack
 </p>
 
-*QGroundControl* (QGC) is a highly intuitive and powerful Ground Control Station (GCS) designed for UAVs. Whether you're a first-time pilot or an experienced professional, QGC provides a seamless user experience for flight control and mission planning, making it the go-to solution for any *MAVLink-enabled drone*.
+---
+
+**Tera Ground Control** is a fork of [QGroundControl](https://github.com/mavlink/QGroundControl) tailored for **Tera** flight operations. It keeps upstream MAVLink compatibility with **PX4** and **ArduPilot**, while adding fly-view tooling, telemetry overlays, and GCS-side workflows used with Tera’s hybrid system, odometry publishers, and companion processes.
+
+This repository is maintained by **Ayush Zenith** (`ayushzenith` / `ayushp.zenith@gmail.com`) for Tera AI–branded builds (application display name **TGroundControl** in installers and desktop metadata).
 
 ---
 
-### 🌟 *Why Choose QGroundControl?*
+## Why this fork
 
-- *🚀 Ease of Use*: A beginner-friendly interface designed for smooth operation without sacrificing advanced features for pros.
-- *✈️ Comprehensive Flight Control*: Full flight control and mission management for *PX4* and *ArduPilot* powered UAVs.
-- *🛠️ Mission Planning*: Easily plan complex missions with a simple drag-and-drop interface.
+- **Hybrid + vision stack**: First-class support for live **odometry** on the map, with estimator-aware styling (**mapping**, **tracking**, **propagation**).
+- **GPS + odometry together**: **GPS_RAW_INT** path on the map, raw GPS telemetry readouts, and optional **GPS vs odometry error** panel (distance at each odometry update), with history sparkline and min/avg/max stats.
+- **Multi-system MAVLink**: Odometry plotting prefers **system 77**, with fallbacks for systems **255** and **1** when 77 is quiet.
+- **EKF insight**: **EKF control / status** panel work focused on EKF2 parameters, visibility, and diagnostics.
+- **Map UX**: Velocity-style overlays, propagation plot options, hybrid **map bounds** display, and fixes for polyline / arrowhead rendering.
+- **Operator controls** (fly view): MAVLink actions to **restart hybrid navigation** (target system **77**) and **stop the camera publisher** (target system **255**), aligned with `playground/` companion scripts.
+- **Settings**: Fly View → Instrument Panel includes a low-profile toggle to **show or hide the navigation error panel** (no clutter on the map itself).
 
-🔍 For a deeper dive into using QGC, check out the [User Manual](https://docs.qgroundcontrol.com/en/) – although thanks to QGC's intuitive UI, you may not even need it!
-
----
-
-### 🚁 *Key Features*
-
-- 🕹️ *Full Flight Control*: Supports all *MAVLink drones*.
-- ⚙️ *Vehicle Setup*: Tailored configuration for *PX4* and *ArduPilot* platforms.
-- 🔧 *Fully Open Source*: Customize and extend the software to suit your needs.
-
-🎯 Check out the latest updates in our [New Features and Release Notes](https://github.com/mavlink/qgroundcontrol/blob/master/CHANGELOG.md).
+Upstream docs remain useful for generic QGC behavior; Tera-specific behavior lives in this tree (notably `src/FlyView/`, `src/Vehicle/`, and `playground/`).
 
 ---
 
-### 💻 *Get Involved!*
+## Prebuilt binaries (GitHub Actions)
 
-QGroundControl is *open-source*, meaning you have the power to shape it! Whether you're fixing bugs, adding features, or customizing for your specific needs, QGC welcomes contributions from the community.
+CI is defined in [`.github/workflows/build-and-release.yml`](.github/workflows/build-and-release.yml) on [`tera-ai/qgroundcontrol`](https://github.com/tera-ai/qgroundcontrol).
 
-🛠️ Start building today with our [Developer Guide](https://dev.qgroundcontrol.com/en/) and [build instructions](https://dev.qgroundcontrol.com/en/getting_started/).
+### Latest release (recommended)
+
+[GitHub **Releases** — latest](https://github.com/tera-ai/qgroundcontrol/releases/latest) — pick assets for your OS, or use direct links when those files are attached to the newest tag:
+
+| Platform | Download |
+|----------|----------|
+| **macOS** (universal `.dmg`) | [TGroundControl.dmg](https://github.com/tera-ai/qgroundcontrol/releases/latest/download/TGroundControl.dmg) |
+| **Windows** (x64 installer `.exe`) | [TGroundControl-installer-AMD64.exe](https://github.com/tera-ai/qgroundcontrol/releases/latest/download/TGroundControl-installer-AMD64.exe) |
+| **Linux** (x86_64 `.AppImage`) | [TGroundControl-x86_64.AppImage](https://github.com/tera-ai/qgroundcontrol/releases/latest/download/TGroundControl-x86_64.AppImage) |
+
+Additional Windows installers (ARM64, combined) and **Linux aarch64** (`.AppImage`) are listed on the [same release page](https://github.com/tera-ai/qgroundcontrol/releases/latest) when published.
+
+If a `releases/latest/download/...` link returns **404**, there may be no tagged release yet — use the CI path below.
+
+### Latest CI build (any branch)
+
+[→ **Build and Release** workflow runs](https://github.com/tera-ai/qgroundcontrol/actions/workflows/build-and-release.yml)
+
+Open the **top successful run** for the branch you care about (e.g. `master`), then scroll to **Artifacts** and download:
+
+| Platform | Artifact name (in the run) |
+|----------|------------------------------|
+| macOS | `TGroundControl` (contains `TGroundControl.dmg`) |
+| Windows x64 | `TGroundControl-installer-AMD64` |
+| Linux x86_64 | `TGroundControl-x86_64` |
+| Linux aarch64 | `TGroundControl-aarch64` |
+
+GitHub may expire workflow artifacts after a period; tagged **Releases** keep binaries longer.
 
 ---
 
-### 🔗 *Useful Links*
+## Build and develop
 
-- 🌐 [Official Website](http://qgroundcontrol.com)
-- 📘 [User Manual](https://docs.qgroundcontrol.com/en/)
-- 🛠️ [Developer Guide](https://dev.qgroundcontrol.com/en/)
-- 💬 [Discussion & Support](https://docs.qgroundcontrol.com/en/Support/Support.html)
-- 🤝 [Contributing](https://dev.qgroundcontrol.com/en/contribute/)
-- 📜 [License Information](https://github.com/mavlink/qgroundcontrol/blob/master/.github/COPYING.md)
+- **Upstream developer guide**: [dev.qgroundcontrol.com](https://dev.qgroundcontrol.com/en/getting_started/) — toolchain, Qt, and platform setup still follow QGC conventions unless noted in our `CMakeLists.txt` comments (e.g. **TGroundControl** `OUTPUT_NAME` and CI packaging expectations).
+- **License**: QGroundControl licensing applies to the upstream-derived code; see [`.github/COPYING.md`](.github/COPYING.md) and upstream [license](https://github.com/mavlink/qgroundcontrol/blob/master/.github/COPYING.md).
 
 ---
 
-With QGroundControl, you're in full command of your UAV, ready to take your missions to the next level.
+## Companion tooling (this repo)
+
+| Path | Role |
+|------|------|
+| `playground/camera_publisher.py` | Camera + MAVLink logger; listens for remote **kill** (`COMMAND_LONG` 246 / param1=3) to exit cleanly. |
+| `playground/odom_publisher.py` | Odometry bench / sender for testing map and EKF paths. |
 
 ---
 
-### Stargazers over time
+## Useful upstream links (still relevant)
 
-[![Stargazers over time](https://starchart.cc/mavlink/qgroundcontrol.svg?variant=adaptive)](https://starchart.cc/mavlink/qgroundcontrol)
+- [QGroundControl user manual](https://docs.qgroundcontrol.com/en/)
+- [QGroundControl developer guide](https://dev.qgroundcontrol.com/en/)
+- [MAVLink](https://mavlink.io/en/)
+
+---
+
+*Tera Ground Control — forked from QGroundControl for Tera’s stack; not an official Dronecode / QGroundControl release.*
