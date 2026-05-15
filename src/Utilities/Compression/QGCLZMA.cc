@@ -8,6 +8,7 @@
  ****************************************************************************/
 
 #include "QGCLZMA.h"
+#include "QGCLoggingCategory.h"
 
 #include <QtCore/QFile>
 
