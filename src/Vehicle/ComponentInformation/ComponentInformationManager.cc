@@ -4,6 +4,7 @@
 #include "Vehicle.h"
 #include "FTPManager.h"
 #include "QGCCompression.h"
+#include "QGCLZMA.h"
 #include "CompInfoGeneral.h"
 #include "CompInfoParam.h"
 #include "CompInfoEvents.h"
@@ -12,6 +13,8 @@
 #include "QGCCachedFileDownload.h"
 #include "QGCLoggingCategory.h"
 
+#include <QtCore/QDir>
+#include <QtCore/QFile>
 #include <QtCore/QStandardPaths>
 
 QGC_LOGGING_CATEGORY(ComponentInformationManagerLog, "Vehicle.ComponentInformationManager")
@@ -320,10 +323,28 @@ void RequestMetaDataTypeStateMachine::_stateRequestCompInfoDeprecated(StateMachi
 
 QString RequestMetaDataTypeStateMachine::_downloadCompleteJsonWorker(const QString& fileName)
 {
-    const QString tempPath = QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation)).absoluteFilePath(_currentCacheFileTag);
-    QString outputFileName = QGCCompression::decompressIfNeeded(fileName, tempPath);
-    if (outputFileName.isEmpty()) {
-        qCWarning(ComponentInformationManagerLog) << "Inflate of compressed json failed" << _currentCacheFileTag;
+    QString outputFileName = fileName;
+
+    // Decompress .xz/.lzma payloads (e.g. PX4 actuators.json.xz) using liblzma
+    // directly. The libarchive-based QGCCompression::decompressIfNeeded() path
+    // regressed for these PX4 blobs and would fail silently, which suppressed
+    // the Vehicle Setup "Actuators" tab. Fall back to QGCCompression for any
+    // other compression formats QGC adds in the future.
+    if (fileName.endsWith(QLatin1String(".lzma"), Qt::CaseInsensitive) ||
+        fileName.endsWith(QLatin1String(".xz"),   Qt::CaseInsensitive)) {
+        outputFileName = QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation)).absoluteFilePath(_currentCacheFileTag);
+        if (QGCLZMA::inflateLZMAFile(fileName, outputFileName)) {
+            QFile(fileName).remove();
+        } else {
+            qCWarning(ComponentInformationManagerLog) << "Inflate of compressed json failed" << _currentCacheFileTag;
+            outputFileName.clear();
+        }
+    } else if (QGCCompression::isCompressedFile(fileName)) {
+        const QString tempPath = QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation)).absoluteFilePath(_currentCacheFileTag);
+        outputFileName = QGCCompression::decompressIfNeeded(fileName, tempPath);
+        if (outputFileName.isEmpty()) {
+            qCWarning(ComponentInformationManagerLog) << "Inflate of compressed json failed" << _currentCacheFileTag;
+        }
     }
 
     if (_currentFileValidCrc) {

@@ -27,6 +27,10 @@ target_sources(${CMAKE_PROJECT_NAME}
         QGCDecompressDevice.h
         QGCArchiveFile.cc
         QGCArchiveFile.h
+        # Direct liblzma-based .xz/.lzma decoder used by ComponentInformation
+        # path (libarchive raw decoder regressed for PX4 actuators.json.xz).
+        QGCLZMA.cc
+        QGCLZMA.h
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -98,6 +102,9 @@ CPMAddPackage(
 )
 
 if(TARGET liblzma)
+    # Link liblzma directly so QGCLZMA can use <lzma.h>.
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE liblzma)
+    target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE "${xz_SOURCE_DIR}/src/liblzma/api")
     # Help libarchive find our liblzma (prevent using system liblzma during cross-compile)
     set(LIBLZMA_INCLUDE_DIR "${xz_SOURCE_DIR}/src/liblzma/api" CACHE PATH "" FORCE)
     set(LIBLZMA_LIBRARY "liblzma" CACHE STRING "" FORCE)
