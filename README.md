@@ -10,7 +10,7 @@
 
 **Tera Ground Control** is a fork of [QGroundControl](https://github.com/mavlink/QGroundControl) tailored for **Tera** flight operations. It keeps upstream MAVLink compatibility with **PX4** and **ArduPilot**, while adding fly-view tooling, telemetry overlays, and GCS-side workflows used with Tera’s hybrid system, odometry publishers, and companion processes.
 
-This repository is maintained by **Ayush Zenith** (`ayushzenith` / `ayush@tera-ai.com`) for Tera AI–branded builds (application display name **TGroundControl** in installers and desktop metadata).
+This repository is maintained by **Ayush Zenith** (`ayushzenith` / `ayush@tera-ai.com`) for Tera AI–branded builds (application display name **TGroundControl** in installers and desktop metadata) -  Feel free to contact for support + feature requests
 
 ---
 
