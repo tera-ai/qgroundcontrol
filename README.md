@@ -10,7 +10,7 @@
 
 **Tera Ground Control** is a fork of [QGroundControl](https://github.com/mavlink/QGroundControl) tailored for **Tera** flight operations. It keeps upstream MAVLink compatibility with **PX4** and **ArduPilot**, while adding fly-view tooling, telemetry overlays, and GCS-side workflows used with Tera’s hybrid system, odometry publishers, and companion processes.
 
-This repository is maintained by **Ayush Zenith** (`ayushzenith` / `ayushp.zenith@gmail.com`) for Tera AI–branded builds (application display name **TGroundControl** in installers and desktop metadata).
+This repository is maintained by **Ayush Zenith** (`ayushzenith` / `ayush@tera-ai.com`) for Tera AI–branded builds (application display name **TGroundControl** in installers and desktop metadata).
 
 ---
 
@@ -18,13 +18,12 @@ This repository is maintained by **Ayush Zenith** (`ayushzenith` / `ayushp.zenit
 
 - **Hybrid + vision stack**: First-class support for live **odometry** on the map, with estimator-aware styling (**mapping**, **tracking**, **propagation**).
 - **GPS + odometry together**: **GPS_RAW_INT** path on the map, raw GPS telemetry readouts, and optional **GPS vs odometry error** panel (distance at each odometry update), with history sparkline and min/avg/max stats.
-- **Multi-system MAVLink**: Odometry plotting prefers **system 77**, with fallbacks for systems **255** and **1** when 77 is quiet.
-- **EKF insight**: **EKF control / status** panel work focused on EKF2 parameters, visibility, and diagnostics.
+- **Multi-system MAVLink**: Odometry plotting prefers sys 77, with fallbacks
+- **EKF insight**: **EKF control / status** panel work focused on parameters, visibility, and diagnostics for closed loop.
 - **Map UX**: Velocity-style overlays, propagation plot options, hybrid **map bounds** display, and fixes for polyline / arrowhead rendering.
-- **Operator controls** (fly view): MAVLink actions to **restart hybrid navigation** (target system **77**) and **stop the camera publisher** (target system **255**), aligned with `playground/` companion scripts.
-- **Settings**: Fly View → Instrument Panel includes a low-profile toggle to **show or hide the navigation error panel** (no clutter on the map itself).
+- **Operator controls** (fly view): MAVLink actions to **restart hybrid navigation** and **stop the camera publisher - non mcap**
 
-Upstream docs remain useful for generic QGC behavior; Tera-specific behavior lives in this tree (notably `src/FlyView/`, `src/Vehicle/`, and `playground/`).
+Upstream docs remain useful for generic QGC behavior; Tera-specific behavior lives in this tree (notably `src/FlyView/`, `src/Vehicle/`).
 
 ---
 
@@ -67,16 +66,6 @@ GitHub may expire workflow artifacts after a period; tagged **Releases** keep bi
 
 - **Upstream developer guide**: [dev.qgroundcontrol.com](https://dev.qgroundcontrol.com/en/getting_started/) — toolchain, Qt, and platform setup still follow QGC conventions unless noted in our `CMakeLists.txt` comments (e.g. **TGroundControl** `OUTPUT_NAME` and CI packaging expectations).
 - **License**: QGroundControl licensing applies to the upstream-derived code; see [`.github/COPYING.md`](.github/COPYING.md) and upstream [license](https://github.com/mavlink/qgroundcontrol/blob/master/.github/COPYING.md).
-
----
-
-## Companion tooling (this repo)
-
-| Path | Role |
-|------|------|
-| `playground/camera_publisher.py` | Camera + MAVLink logger; listens for remote **kill** (`COMMAND_LONG` 246 / param1=3) to exit cleanly. |
-| `playground/odom_publisher.py` | Odometry bench / sender for testing map and EKF paths. |
-
 ---
 
 ## Useful upstream links (still relevant)
