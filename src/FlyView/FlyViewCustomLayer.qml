@@ -188,7 +188,7 @@ Item {
         }
     }
 
-    // System control buttons (restart hybrid nav, kill camera publisher)
+    // System control buttons (start dragonfly, restart dragonfly)
     Rectangle {
         id:                     systemControlPanel
         anchors.right:          parent.right
@@ -212,7 +212,36 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
             }
 
-            // Restart Hybrid Navigation System (target system 77)
+            // Start Dragonfly (host launcher service, target system 88)
+            Rectangle {
+                id:             startDragonflyBtn
+                width:          startDragonflyLabel.width + ScreenTools.defaultFontPixelWidth * 2
+                height:         startDragonflyLabel.height + ScreenTools.defaultFontPixelWidth
+                radius:         ScreenTools.defaultFontPixelWidth * 0.3
+                color:          startDragonflyMouse.pressed ? "#2E7D32" : (startDragonflyMouse.containsMouse ? "#43A047" : "#388E3C")
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                QGCLabel {
+                    id:                     startDragonflyLabel
+                    text:                   qsTr("Start Dragonfly")
+                    color:                  "white"
+                    font.pointSize:         ScreenTools.smallFontPointSize
+                    anchors.centerIn:       parent
+                }
+
+                MouseArea {
+                    id:             startDragonflyMouse
+                    anchors.fill:   parent
+                    hoverEnabled:   true
+                    onClicked: {
+                        if (_activeVehicle) {
+                            _activeVehicle.sendCommandToSystem(88, 0, 31010, 1, 0, 0, 0, 0, 0, 0)
+                        }
+                    }
+                }
+            }
+
+            // Restart Dragonfly (relocalize hybrid nav, target system 77)
             Rectangle {
                 id:             restartHybridBtn
                 width:          restartHybridLabel.width + ScreenTools.defaultFontPixelWidth * 2
@@ -223,7 +252,7 @@ Item {
 
                 QGCLabel {
                     id:                     restartHybridLabel
-                    text:                   qsTr("Restart Hybrid Nav")
+                    text:                   qsTr("Restart Dragonfly")
                     color:                  "white"
                     font.pointSize:         ScreenTools.smallFontPointSize
                     anchors.centerIn:       parent
@@ -236,35 +265,6 @@ Item {
                     onClicked: {
                         if (_activeVehicle) {
                             _activeVehicle.sendCommandToSystem(77, 0, 246, 1, 0, 0, 0, 0, 0, 0)
-                        }
-                    }
-                }
-            }
-
-            // Kill Camera Publisher (target system 255)
-            Rectangle {
-                id:             killCameraBtn
-                width:          killCameraLabel.width + ScreenTools.defaultFontPixelWidth * 2
-                height:         killCameraLabel.height + ScreenTools.defaultFontPixelWidth
-                radius:         ScreenTools.defaultFontPixelWidth * 0.3
-                color:          killCameraMouse.pressed ? "#C62828" : (killCameraMouse.containsMouse ? "#E53935" : "#D32F2F")
-                anchors.horizontalCenter: parent.horizontalCenter
-
-                QGCLabel {
-                    id:                     killCameraLabel
-                    text:                   qsTr("Kill Camera Publisher")
-                    color:                  "white"
-                    font.pointSize:         ScreenTools.smallFontPointSize
-                    anchors.centerIn:       parent
-                }
-
-                MouseArea {
-                    id:             killCameraMouse
-                    anchors.fill:   parent
-                    hoverEnabled:   true
-                    onClicked: {
-                        if (_activeVehicle) {
-                            _activeVehicle.sendCommandToSystem(255, 0, 246, 3, 0, 0, 0, 0, 0, 0)
                         }
                     }
                 }
