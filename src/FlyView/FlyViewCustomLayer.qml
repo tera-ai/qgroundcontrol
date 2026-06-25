@@ -269,6 +269,35 @@ Item {
                     }
                 }
             }
+
+            // Stop Dragonfly (host launcher service, target system 88, param1 = 2)
+            Rectangle {
+                id:             stopDragonflyBtn
+                width:          stopDragonflyLabel.width + ScreenTools.defaultFontPixelWidth * 2
+                height:         stopDragonflyLabel.height + ScreenTools.defaultFontPixelWidth
+                radius:         ScreenTools.defaultFontPixelWidth * 0.3
+                color:          stopDragonflyMouse.pressed ? "#B71C1C" : (stopDragonflyMouse.containsMouse ? "#E53935" : "#C62828")
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                QGCLabel {
+                    id:                     stopDragonflyLabel
+                    text:                   qsTr("Stop Dragonfly")
+                    color:                  "white"
+                    font.pointSize:         ScreenTools.smallFontPointSize
+                    anchors.centerIn:       parent
+                }
+
+                MouseArea {
+                    id:             stopDragonflyMouse
+                    anchors.fill:   parent
+                    hoverEnabled:   true
+                    onClicked: {
+                        if (_activeVehicle) {
+                            _activeVehicle.sendCommandToSystem(88, 0, 31010, 2, 0, 0, 0, 0, 0, 0)
+                        }
+                    }
+                }
+            }
         }
     }
 
