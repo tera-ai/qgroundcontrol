@@ -200,6 +200,26 @@ Item {
         color:                  Qt.rgba(0, 0, 0, 0.7)
         visible:                _activeVehicle
 
+        // MCAP publisher liveness: the publisher beacons ODOMETRY from system
+        // 77 (same channel Dragonfly uses), so a fresh odom arrival means the
+        // recorder is alive. _mcapTick forces the binding to re-evaluate.
+        property var  _odomPts:     _activeVehicle ? _activeVehicle.odometryPathPoints : null
+        property int  _mcapTick:    0
+        property bool _mcapAlive: {
+            var _ = _mcapTick
+            if (!_odomPts) return false
+            var arrivalMs = _odomPts.lastArrivalMs
+            if (!arrivalMs || arrivalMs === 0) return false
+            return (Date.now() - arrivalMs) < 5000
+        }
+
+        Timer {
+            interval:           1000
+            repeat:             true
+            running:            systemControlPanel.visible
+            onTriggered:        systemControlPanel._mcapTick++
+        }
+
         Column {
             id:                 systemControlColumn
             anchors.centerIn:   parent
@@ -296,6 +316,88 @@ Item {
                             _activeVehicle.sendCommandToSystem(88, 0, 31010, 2, 0, 0, 0, 0, 0, 0)
                         }
                     }
+                }
+            }
+
+            // Start MCAP publisher (host launcher system 88, MAV_CMD_USER_2 / 31011, param1=1)
+            Rectangle {
+                id:             startMcapBtn
+                width:          startMcapLabel.width + ScreenTools.defaultFontPixelWidth * 2
+                height:         startMcapLabel.height + ScreenTools.defaultFontPixelWidth
+                radius:         ScreenTools.defaultFontPixelWidth * 0.3
+                color:          startMcapMouse.pressed ? "#006064" : (startMcapMouse.containsMouse ? "#0097A7" : "#00838F")
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                QGCLabel {
+                    id:                     startMcapLabel
+                    text:                   qsTr("Start MCAP")
+                    color:                  "white"
+                    font.pointSize:         ScreenTools.smallFontPointSize
+                    anchors.centerIn:       parent
+                }
+
+                MouseArea {
+                    id:             startMcapMouse
+                    anchors.fill:   parent
+                    hoverEnabled:   true
+                    onClicked: {
+                        if (_activeVehicle) {
+                            _activeVehicle.sendCommandToSystem(88, 0, 31011, 1, 0, 0, 0, 0, 0, 0)
+                        }
+                    }
+                }
+            }
+
+            // Stop MCAP publisher (host launcher system 88, MAV_CMD_USER_2 / 31011, param1=2)
+            Rectangle {
+                id:             stopMcapBtn
+                width:          stopMcapLabel.width + ScreenTools.defaultFontPixelWidth * 2
+                height:         stopMcapLabel.height + ScreenTools.defaultFontPixelWidth
+                radius:         ScreenTools.defaultFontPixelWidth * 0.3
+                color:          stopMcapMouse.pressed ? "#BF360C" : (stopMcapMouse.containsMouse ? "#EF6C00" : "#E65100")
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                QGCLabel {
+                    id:                     stopMcapLabel
+                    text:                   qsTr("Stop MCAP")
+                    color:                  "white"
+                    font.pointSize:         ScreenTools.smallFontPointSize
+                    anchors.centerIn:       parent
+                }
+
+                MouseArea {
+                    id:             stopMcapMouse
+                    anchors.fill:   parent
+                    hoverEnabled:   true
+                    onClicked: {
+                        if (_activeVehicle) {
+                            _activeVehicle.sendCommandToSystem(88, 0, 31011, 2, 0, 0, 0, 0, 0, 0)
+                        }
+                    }
+                }
+            }
+
+            // MCAP publisher status light (green when a sys-77 odom beacon was
+            // seen within the last 5 s, red otherwise)
+            Row {
+                spacing:                  ScreenTools.defaultFontPixelWidth * 0.5
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                Rectangle {
+                    width:                  ScreenTools.defaultFontPixelWidth * 1.2
+                    height:                 width
+                    radius:                 width / 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    color:                  systemControlPanel._mcapAlive ? "#00E04B" : "#FF5252"
+                    border.color:           "#000000"
+                    border.width:           1
+                }
+
+                QGCLabel {
+                    text:                   qsTr("MCAP Publisher")
+                    color:                  "white"
+                    font.pointSize:         ScreenTools.smallFontPointSize
+                    anchors.verticalCenter: parent.verticalCenter
                 }
             }
         }
