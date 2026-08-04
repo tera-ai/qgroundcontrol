@@ -350,6 +350,19 @@ void Vehicle::_commonInit(LinkInterface* link)
     _flightTimeUpdater.setSingleShot(false);
     connect(&_flightTimeUpdater, &QTimer::timeout, this, &Vehicle::_updateFlightTime);
 
+    // GPS_GLOBAL_ORIGIN is only broadcast when the autopilot sets or moves its
+    // origin, which normally happens as EKF2 initializes -- before QGC is
+    // connected. Nothing else asks for it, so without this poll ekfOrigin stays
+    // invalid for the whole session and anything needing the local NED frame
+    // silently falls back to a different reference point. Poll until we get it.
+    _ekfOriginRequestTimer.setInterval(5000);
+    _ekfOriginRequestTimer.setSingleShot(false);
+    connect(&_ekfOriginRequestTimer, &QTimer::timeout, this, &Vehicle::_requestEkfOrigin);
+    connect(this, &Vehicle::initialConnectComplete, this, [this]() {
+        _requestEkfOrigin();
+        _ekfOriginRequestTimer.start();
+    });
+
     // Set video stream to udp if running ArduSub and Video is disabled
     if (sub() && SettingsManager::instance()->videoSettings()->videoSource()->rawValue() == VideoSettings::videoDisabled) {
         SettingsManager::instance()->videoSettings()->videoSource()->setRawValue(VideoSettings::videoSourceUDPH264);
@@ -1215,11 +1228,33 @@ void Vehicle::_handleGpsGlobalOrigin(mavlink_message_t& message)
                                 origin.longitude / 10000000.0,
                                 origin.altitude / 1000.0);
     
+    _ekfOriginRequestTimer.stop();
+
     if (newEkfOrigin != _ekfOrigin) {
         _ekfOrigin = newEkfOrigin;
         qCDebug(VehicleLog) << "EKF Origin updated:" << _ekfOrigin;
         emit ekfOriginChanged(_ekfOrigin);
     }
+}
+
+void Vehicle::_requestEkfOrigin()
+{
+    if (_ekfOrigin.isValid()) {
+        _ekfOriginRequestTimer.stop();
+        return;
+    }
+
+    SharedLinkInterfacePtr sharedLink = vehicleLinkManager()->primaryLink().lock();
+    if (!sharedLink || sharedLink->linkConfiguration()->isHighLatency() || sharedLink->isLogReplay()) {
+        return;
+    }
+
+    // Errors are suppressed: until the estimator has an origin the autopilot
+    // legitimately refuses this, and we simply ask again.
+    sendMavCommand(_defaultComponentId,
+                   MAV_CMD_REQUEST_MESSAGE,
+                   false,
+                   static_cast<float>(MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN));
 }
 
 void Vehicle::_updateArmed(bool armed)

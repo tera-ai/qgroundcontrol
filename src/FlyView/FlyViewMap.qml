@@ -396,6 +396,10 @@ FlightMap {
             function onPlotPropagationChanged() {
                 odometryPathPolyline.rebuildFromSource()
             }
+            // The reference point moved, so every stored coordinate changed.
+            function onPathReprojected() {
+                odometryPathPolyline.rebuildFromSource()
+            }
         }
     }
 

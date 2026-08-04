@@ -118,6 +118,9 @@ signals:
     void referenceTypeChanged();
     void timingChanged();
     void odomAttitudeChanged();
+    /// The reference point moved and every stored point has been re-projected
+    /// onto it. Consumers holding their own copy of the path must rebuild.
+    void pathReprojected();
 
 public slots:
     void clear(void);
@@ -126,13 +129,26 @@ public slots:
     void addOdometryPoint(quint64 timeUsec, const float q[4],
                           double x, double y, double z, int estimatorType);
 
+private slots:
+    void _ekfOriginChanged(const QGeoCoordinate& ekfOrigin);
+
 private:
     void _setReferenceInfo(bool usingFallback, const QString& referenceType);
     void _updateOdomAttitude(const float q[4]);
+    /// Picks the best available reference point, preferring the EKF origin.
+    /// Safe to call repeatedly; only acts while we have no reference at all.
+    void _resolveReference(void);
+    /// Switches to a new reference and re-projects every stored point onto it.
+    void _adoptReference(const QGeoCoordinate& reference, bool usingFallback, const QString& referenceType);
 
     struct Entry {
         QGeoCoordinate coord;
         int            type;
+        // The position as it arrived in the ODOMETRY message. Kept so the path
+        // can be re-projected if the reference point changes underneath us.
+        double         x;
+        double         y;
+        double         z;
     };
 
     Vehicle*        _vehicle;

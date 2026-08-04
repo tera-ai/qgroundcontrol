@@ -20,6 +20,10 @@ OdometryPathPoints::OdometryPathPoints(Vehicle* vehicle, QObject* parent)
     : QObject(parent)
     , _vehicle(vehicle)
 {
+    // The autopilot only broadcasts GPS_GLOBAL_ORIGIN when the origin is set or
+    // moved, so it commonly turns up long after we have started plotting
+    // against a fallback. Adopt it whenever it does arrive.
+    connect(vehicle, &Vehicle::ekfOriginChanged, this, &OdometryPathPoints::_ekfOriginChanged);
     qDebug() << "OdometryPathPoints created for vehicle" << vehicle->id();
 }
 
@@ -70,25 +74,7 @@ void OdometryPathPoints::setEnabled(bool enabled)
             clear();
             _setReferenceInfo(false, QString());
         } else {
-            // Set reference coordinate when enabling
-            // Priority: EKF origin (correct) > home position (fallback) > current GPS (last resort)
-            _referenceCoordinate = _vehicle->ekfOrigin();
-            if (_referenceCoordinate.isValid()) {
-                _setReferenceInfo(false, QStringLiteral("EKF Origin"));
-            } else {
-                qDebug() << "Odometry Path: EKF origin not available, falling back to home position";
-                _referenceCoordinate = _vehicle->homePosition();
-                if (_referenceCoordinate.isValid()) {
-                    _setReferenceInfo(true, QStringLiteral("Home Pos"));
-                } else {
-                    qDebug() << "Odometry Path: Home position not available, falling back to current GPS";
-                    _referenceCoordinate = _vehicle->coordinate();
-                    if (_referenceCoordinate.isValid()) {
-                        _setReferenceInfo(true, QStringLiteral("GPS"));
-                    }
-                }
-            }
-            qDebug() << "Odometry Path reference coordinate:" << _referenceCoordinate << "type:" << _referenceType;
+            _resolveReference();
         }
         emit enabledChanged();
     }
@@ -143,26 +129,7 @@ void OdometryPathPoints::addOdometryPoint(quint64 timeUsec, const float q[4],
 
     _updateOdomAttitude(q);
 
-    // Update reference if we don't have one yet
-    if (!_referenceCoordinate.isValid()) {
-        _referenceCoordinate = _vehicle->ekfOrigin();
-        if (_referenceCoordinate.isValid()) {
-            _setReferenceInfo(false, QStringLiteral("EKF Origin"));
-        } else {
-            qDebug() << "Odometry Path: EKF origin not available, falling back to home position";
-            _referenceCoordinate = _vehicle->homePosition();
-            if (_referenceCoordinate.isValid()) {
-                _setReferenceInfo(true, QStringLiteral("Home Pos"));
-            } else {
-                qDebug() << "Odometry Path: Home position not available, falling back to current GPS";
-                _referenceCoordinate = _vehicle->coordinate();
-                if (_referenceCoordinate.isValid()) {
-                    _setReferenceInfo(true, QStringLiteral("GPS"));
-                }
-            }
-        }
-        qDebug() << "Odometry Path updated reference:" << _referenceCoordinate << "type:" << _referenceType;
-    }
+    _resolveReference();
 
     if (!_referenceCoordinate.isValid()) {
         qDebug() << "Odometry Path: No valid reference coordinate";
@@ -208,7 +175,7 @@ void OdometryPathPoints::addOdometryPoint(quint64 timeUsec, const float q[4],
         }
     }
 
-    _entries.append({coordinate, estimatorType});
+    _entries.append({coordinate, estimatorType, x, y, z});
     if (typeIsKnown) {
         _typeCounts[estimatorType]++;
     }
@@ -227,6 +194,69 @@ void OdometryPathPoints::clear(void)
     _referenceCoordinate = QGeoCoordinate();
     emit pointsCleared();
     emit lastPointChanged();
+}
+
+void OdometryPathPoints::_resolveReference(void)
+{
+    if (_referenceCoordinate.isValid()) {
+        return;
+    }
+
+    // Priority: EKF origin (correct) > home position (fallback) > current GPS (last resort).
+    // ODOMETRY positions are measured from the EKF origin, so any fallback puts
+    // the whole path out by the distance between that point and the origin --
+    // routinely tens of metres, since PX4 sets the origin where EKF2 initializes
+    // and only sets home on arming.
+    QGeoCoordinate reference = _vehicle->ekfOrigin();
+    if (reference.isValid()) {
+        _adoptReference(reference, false, QStringLiteral("EKF Origin"));
+        return;
+    }
+
+    qDebug() << "Odometry Path: EKF origin not available, falling back to home position";
+    reference = _vehicle->homePosition();
+    if (reference.isValid()) {
+        _adoptReference(reference, true, QStringLiteral("Home Pos"));
+        return;
+    }
+
+    qDebug() << "Odometry Path: Home position not available, falling back to current GPS";
+    reference = _vehicle->coordinate();
+    if (reference.isValid()) {
+        _adoptReference(reference, true, QStringLiteral("GPS"));
+    }
+}
+
+void OdometryPathPoints::_adoptReference(const QGeoCoordinate& reference, bool usingFallback, const QString& referenceType)
+{
+    _referenceCoordinate = reference;
+    _setReferenceInfo(usingFallback, referenceType);
+    qDebug() << "Odometry Path reference coordinate:" << _referenceCoordinate << "type:" << referenceType;
+
+    if (_entries.isEmpty()) {
+        return;
+    }
+
+    for (Entry& e : _entries) {
+        QGCGeo::convertNedToGeo(e.x, e.y, e.z, _referenceCoordinate, e.coord);
+    }
+
+    _lastPoint = _entries.last().coord;
+    emit lastPointChanged();
+    emit pathReprojected();
+}
+
+void OdometryPathPoints::_ekfOriginChanged(const QGeoCoordinate& ekfOrigin)
+{
+    // Always take the origin over a fallback, even if the two happen to
+    // coincide, so the UI stops reporting that it is using a fallback.
+    if (!ekfOrigin.isValid() || (!_usingFallback && (ekfOrigin == _referenceCoordinate))) {
+        return;
+    }
+
+    // Either we were on a fallback and can now be correct, or the autopilot
+    // moved its origin mid-session and every point we have is now stale.
+    _adoptReference(ekfOrigin, false, QStringLiteral("EKF Origin"));
 }
 
 void OdometryPathPoints::_setReferenceInfo(bool usingFallback, const QString& referenceType)

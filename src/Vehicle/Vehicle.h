@@ -926,6 +926,7 @@ private slots:
     void _mavlinkMessageStatus              (int uasId, uint64_t totalSent, uint64_t totalReceived, uint64_t totalLoss, float lossPercent);
     void _orbitTelemetryTimeout             ();
     void _updateFlightTime                  ();
+    void _requestEkfOrigin                  ();
     void _gotProgressUpdate                 (float progressValue);
     void _doSetHomeTerrainReceived          (bool success, QList<double> heights);
     void _roiTerrainReceived                (bool success, QList<double> heights);
@@ -1088,6 +1089,7 @@ void _activeVehicleChanged          (Vehicle* newActiveVehicle);
 
     QElapsedTimer                   _flightTimer;
     QTimer                          _flightTimeUpdater;
+    QTimer                          _ekfOriginRequestTimer; ///< Polls for GPS_GLOBAL_ORIGIN until the origin is known
     TrajectoryPoints*               _trajectoryPoints = nullptr;
     GpsPathPoints*                  _gpsPathPoints = nullptr;
     OdometryPathPoints*             _odometryPathPoints = nullptr;
