@@ -147,6 +147,8 @@ public:
     Q_PROPERTY(GpsPathPoints*       gpsPathPoints               MEMBER _gpsPathPoints                                               CONSTANT)
     Q_PROPERTY(OdometryPathPoints*  odometryPathPoints          MEMBER _odometryPathPoints                                          CONSTANT)
     Q_PROPERTY(QmlObjectListModel*  cameraTriggerPoints         READ cameraTriggerPoints                                            CONSTANT)
+    /// Latest value of each NAMED_VALUE_FLOAT / NAMED_VALUE_INT by name
+    Q_PROPERTY(QVariantMap          namedValues                 READ namedValues                                                    NOTIFY namedValuesChanged)
     Q_PROPERTY(float                latitude                    READ latitude                                                       NOTIFY coordinateChanged)
     Q_PROPERTY(float                longitude                   READ longitude                                                      NOTIFY coordinateChanged)
     Q_PROPERTY(int                  rcRSSI                      READ rcRSSI                                                         NOTIFY rcRSSIChanged)
@@ -430,6 +432,7 @@ public:
     // Property accessors
 
     QGeoCoordinate coordinate() { return _coordinate; }
+    QVariantMap namedValues() const { return _namedValues; }
     QGeoCoordinate armedPosition    () { return _armedPosition; }
 
     qreal getInitialGCSPressure() const { return _initialGCSPressure; }
@@ -812,6 +815,7 @@ public slots:
 
 signals:
     void coordinateChanged              (QGeoCoordinate coordinate);
+    void namedValuesChanged             ();
     void mavlinkMessageReceived         (const mavlink_message_t& message);
     void homePositionChanged            (const QGeoCoordinate& homePosition);
     void ekfOriginChanged               (const QGeoCoordinate& ekfOrigin);
@@ -941,6 +945,7 @@ void _activeVehicleChanged          (Vehicle* newActiveVehicle);
     void _handleHomePosition            (mavlink_message_t& message);
     void _handleGpsGlobalOrigin         (mavlink_message_t& message);
     void _handleHeartbeat               (mavlink_message_t& message);
+    void _handleNamedValue              (const mavlink_message_t& message);
     void _handleCurrentMode             (mavlink_message_t& message);
     void _handleRadioStatus             (mavlink_message_t& message);
     void _handleRCChannels              (mavlink_message_t& message);
@@ -1093,6 +1098,7 @@ void _activeVehicleChanged          (Vehicle* newActiveVehicle);
     TrajectoryPoints*               _trajectoryPoints = nullptr;
     GpsPathPoints*                  _gpsPathPoints = nullptr;
     OdometryPathPoints*             _odometryPathPoints = nullptr;
+    QVariantMap                     _namedValues;
     QElapsedTimer                   _lastOdometry77Time;  ///< Tracks when we last received ODOMETRY from system 77 (primary)
     QElapsedTimer                   _lastOdometry255Time; ///< Tracks when we last received ODOMETRY from system 255 (fallback)
     QmlObjectListModel              _cameraTriggerPoints;

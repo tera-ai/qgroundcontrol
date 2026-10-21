@@ -1,5 +1,6 @@
 #include "AutoPilotPlugin.h"
 #include "FirmwarePlugin.h"
+#include "MultiVehicleManager.h"
 #include "QGCApplication.h"
 #include "QGCLoggingCategory.h"
 #include "Vehicle.h"
@@ -58,10 +59,16 @@ void AutoPilotPlugin::parametersReadyPreChecks()
         }
     }
 
-    if (!_setupComplete) {
-        // Take the user to Vehicle Config Summary
-        qgcApp()->showVehicleConfig();
-        QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+    // TGC_NO_SETUP_PROMPT: simulated fleets (e.g. PX4 SITL without RC) never
+    // finish setup, so don't prompt for it
+    if (!_setupComplete && !qEnvironmentVariableIsSet("TGC_NO_SETUP_PROMPT")) {
+        // Take the user to Vehicle Config Summary, unless several vehicles are
+        // connected: in multi-vehicle operations each one reconnecting would
+        // pull the operator out of the Fly view
+        if (MultiVehicleManager::instance()->vehicles()->count() <= 1) {
+            qgcApp()->showVehicleConfig();
+            QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        }
         qgcApp()->showAppMessage(tr("One or more vehicle components require setup prior to flight."));
     }
 }

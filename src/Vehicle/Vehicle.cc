@@ -483,6 +483,28 @@ void Vehicle::resetCounters()
     _heardFrom          = false;
 }
 
+void Vehicle::_handleNamedValue(const mavlink_message_t& message)
+{
+    char name[11] = {};  // MAVLink names are 10 chars, not always terminated
+    QVariant value;
+    if (message.msgid == MAVLINK_MSG_ID_NAMED_VALUE_FLOAT) {
+        mavlink_named_value_float_t nv;
+        mavlink_msg_named_value_float_decode(&message, &nv);
+        memcpy(name, nv.name, sizeof(nv.name));
+        value = nv.value;
+    } else {
+        mavlink_named_value_int_t nv;
+        mavlink_msg_named_value_int_decode(&message, &nv);
+        memcpy(name, nv.name, sizeof(nv.name));
+        value = nv.value;
+    }
+    const QString key = QString::fromLatin1(name);
+    if (_namedValues.value(key) != value) {
+        _namedValues[key] = value;
+        emit namedValuesChanged();
+    }
+}
+
 void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t message)
 {
     if (message.sysid != _id && message.sysid != 0) {
@@ -599,6 +621,10 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
         break;
     case MAVLINK_MSG_ID_ODOMETRY:
         _handleOdometry(message);
+        break;
+    case MAVLINK_MSG_ID_NAMED_VALUE_FLOAT:
+    case MAVLINK_MSG_ID_NAMED_VALUE_INT:
+        _handleNamedValue(message);
         break;
     case MAVLINK_MSG_ID_DEBUG_FLOAT_ARRAY:
         // Forwarded by tera-system1's flight_controller as the "TERA_MAP"

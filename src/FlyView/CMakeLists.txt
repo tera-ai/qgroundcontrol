@@ -48,6 +48,7 @@ qt_add_qml_module(FlyViewModule
         GuidedToolStripAction.qml
         GuidedValueSlider.qml
         MultiRotorChecklist.qml
+        MultiAgentDemoPanel.qml
         MultiVehicleList.qml
         ObstacleDistanceOverlay.qml
         ObstacleDistanceOverlayMap.qml

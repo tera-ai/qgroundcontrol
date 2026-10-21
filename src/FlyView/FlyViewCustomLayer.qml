@@ -30,6 +30,16 @@ Item {
     // driven by the odometry attitude instead of the vehicle facts.
     property bool _showOdomAttitude: false
 
+    // Air-ground teaming demo flow: survey, ground goals, start. Shows only
+    // when the demo's ground vehicle endpoints are connected.
+    MultiAgentDemoPanel {
+        id:                         multiAgentDemoPanel
+        anchors.top:                parent.top
+        anchors.topMargin:          parentToolInsets.topEdgeCenterInset + ScreenTools.defaultFontPixelWidth
+        anchors.horizontalCenter:   parent.horizontalCenter
+        mapControl:                 _root.mapControl
+    }
+
     // Path overlay toggle controls
     Rectangle {
         id:                     pathControlPanel
@@ -1037,7 +1047,7 @@ Item {
         topEdgeLeftInset:       parentToolInsets.topEdgeLeftInset
                                     + (attitudeOverlay.visible ? attitudeOverlay.width + ScreenTools.defaultFontPixelWidth : 0)
                                     + (ekfCtrlPanel.visible ? ekfCtrlPanel.width + ScreenTools.defaultFontPixelWidth : 0)
-        topEdgeCenterInset:     parentToolInsets.topEdgeCenterInset
+        topEdgeCenterInset:     parentToolInsets.topEdgeCenterInset + (multiAgentDemoPanel.visible ? multiAgentDemoPanel.height + ScreenTools.defaultFontPixelWidth : 0)
         topEdgeRightInset:      parentToolInsets.topEdgeRightInset + (pathControlPanel.visible ? pathControlPanel.height + ScreenTools.defaultFontPixelWidth * 2 : 0) + (systemControlPanel.visible ? systemControlPanel.height + ScreenTools.defaultFontPixelWidth : 0)
         bottomEdgeLeftInset:    parentToolInsets.bottomEdgeLeftInset
                                     + (navErrorPanel.visible ? navErrorPanel.height + ScreenTools.defaultFontPixelWidth : 0)
