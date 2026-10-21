@@ -6,6 +6,8 @@
   <strong>Tera Ground Control</strong> (Teragroundcontrol) · Ground control for Tera’s hybrid navigation stack
 </p>
 
+> **Air-ground teaming demo:** this branch adds the multi-agent demo panel and the drones' map overlay used by the PAS-Tera-AI GPS-denied demo. See [MULTI_AGENT_DEMO.md](MULTI_AGENT_DEMO.md).
+
 ---
 
 **Tera Ground Control** is a fork of [QGroundControl](https://github.com/mavlink/QGroundControl) tailored for **Tera** flight operations. It keeps upstream MAVLink compatibility with **PX4** and **ArduPilot**, while adding fly-view tooling, telemetry overlays, and GCS-side workflows used with Tera’s hybrid system, odometry publishers, and companion processes.

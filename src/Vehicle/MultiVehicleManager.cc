@@ -131,7 +131,11 @@ void MultiVehicleManager::_vehicleHeartbeatInfo(LinkInterface* link, int vehicle
     emit vehicleAdded(vehicle);
 
     if (_vehicles->count() > 1) {
-        qgcApp()->showAppMessage(tr("Connected to Vehicle %1").arg(vehicleId));
+        // TGC_NO_SETUP_PROMPT (simulated fleets): vehicles reconnect every run,
+        // and each modal message would cover the map until dismissed
+        if (!qEnvironmentVariableIsSet("TGC_NO_SETUP_PROMPT")) {
+            qgcApp()->showAppMessage(tr("Connected to Vehicle %1").arg(vehicleId));
+        }
     } else {
         setActiveVehicle(vehicle);
     }
