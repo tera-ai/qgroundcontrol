@@ -4,7 +4,7 @@ This branch adds what TGroundControl needs for the PAS-Tera-AI GPS-denied
 air-ground demo: drones survey a site without GPS, a ground station builds a
 driving map from their imagery, and trucks plan and drive on it. The demo
 itself lives in PAS-Tera-AI, branch `dev/gps-denied-demo`,
-`demo/gps_denied/`. Its `README.md` explains the system and `AGENTS.md` is
+`demo/gps_denied/`. Its `README.md` explains the system and `AGENT_HANDOFF.md` is
 the handoff for an agent continuing the work.
 
 ## What this branch changes
